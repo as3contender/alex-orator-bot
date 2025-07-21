@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # PostgreSQL для приложения
+  app-db:
+    image: postgres:15-alpine
+    container_name: cloverdashbot-app-db-local
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: cloverdashbot
+      POSTGRES_PASSWORD: local_password
+    volumes:
+      - app-db-data-local:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - cloverdashbot-local-network
+    restart: unless-stopped
+
+  # PostgreSQL для пользовательских данных
+  data-db:
+    image: postgres:15-alpine
+    container_name: cloverdashbot-data-db-local
+    environment:
+      POSTGRES_DB: data_db
+      POSTGRES_USER: cloverdashbot
+      POSTGRES_PASSWORD: local_password
+    volumes:
+      - data-db-data-local:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - cloverdashbot-local-network
+    restart: unless-stopped
+
+  # Backend API (для разработки)
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloverdashbot-backend-local
+    environment:
+      - DEBUG=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_api_key_here}
+      - APP_DATABASE_URL=postgresql://cloverdashbot:local_password@app-db:5432/app_db
+      - DATA_DATABASE_URL=postgresql://cloverdashbot:local_password@data-db:5432/data_db
+      - JWT_SECRET_KEY=local-jwt-secret-key
+      - SECRET_KEY=local-secret-key
+    ports:
+      - "8000:8000"
+    depends_on:
+      - app-db
+      - data-db
+    networks:
+      - cloverdashbot-local-network
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Telegram Bot (для разработки)
+  telegram-bot:
+    build: 
+      context: ./telegram-bot
+      dockerfile: Dockerfile
+    container_name: cloverdashbot-telegram-local
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-your_telegram_bot_token_here}
+      - BACKEND_URL=http://backend:8000
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - backend
+    networks:
+      - cloverdashbot-local-network
+    restart: unless-stopped
+    volumes:
+      - ./telegram-bot:/app
+      - ./logs:/app/logs
+    command: python bot.py
+
+volumes:
+  app-db-data-local:
+    driver: local
+  data-db-data-local:
+    driver: local
+
+networks:
+  cloverdashbot-local-network:
+    driver: bridge 
