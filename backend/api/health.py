@@ -4,7 +4,6 @@ from typing import Dict, Any
 
 from services.app_database import app_database_service
 from services.data_database import data_database_service
-from services.llm_service import llm_service
 
 router = APIRouter()
 
@@ -38,15 +37,6 @@ async def detailed_health_check() -> Dict[str, Any]:
         health_info["components"]["data_database"] = {"status": "unhealthy", "error": str(e)}
         health_info["status"] = "degraded"
 
-    # Проверка OpenAI
-    try:
-        await llm_service.check_connection()
-        health_info["components"]["openai"] = {"status": "healthy"}
-    except Exception as e:
-        logger.error(f"OpenAI health check failed: {e}")
-        health_info["components"]["openai"] = {"status": "unhealthy", "error": str(e)}
-        health_info["status"] = "degraded"
-
     return health_info
 
 
@@ -57,7 +47,6 @@ async def readiness_check() -> Dict[str, str]:
         # Проверяем все критические компоненты
         await app_database_service.check_connection()
         await data_database_service.check_connection()
-        await llm_service.check_connection()
 
         return {"status": "ready"}
     except Exception as e:

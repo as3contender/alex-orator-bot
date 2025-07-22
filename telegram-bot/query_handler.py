@@ -44,11 +44,9 @@ class QueryHandler:
 
             # Выполняем запрос
             try:
-                result = await self.api_client.execute_natural_query(query_text)
-
                 # Форматируем результат
                 formatted_result = format_query_results(
-                    result, language, settings.show_explanations, settings.show_sql, settings.max_results
+                    None, language, settings.show_explanations, settings.show_sql, settings.max_results
                 )
 
                 # Отправляем результат
@@ -137,8 +135,8 @@ class QueryHandler:
 
         # Выполняем пример запроса
         try:
-            result = await self.api_client.execute_natural_query(sample_text)
-            formatted_result = format_query_results(result, language, True, True, 20)
+            # Форматируем результат
+            formatted_result = format_query_results(None, language, True, True, 20)
             await query.edit_message_text(formatted_result, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Sample query failed: {e}")
@@ -149,8 +147,8 @@ class QueryHandler:
         table_name = callback_data.replace("sample_table_", "")
 
         try:
-            sample_data = await self.api_client.get_sample_data(table_name, 10)
-            formatted_data = format_sample_data(sample_data, language)
+            # Форматируем результат
+            formatted_data = format_query_results(None, language, True, True, 10)
             await query.edit_message_text(formatted_data, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Sample table failed: {e}")
@@ -169,8 +167,9 @@ class QueryHandler:
                 await query.edit_message_text(get_text("no_tables", language))
                 return
 
-            tables_text = format_tables_list(tables, language)
-            await query.edit_message_text(tables_text, parse_mode="HTML")
+            # Форматируем результат
+            formatted_tables = format_query_results(None, language, True, True, 0)
+            await query.edit_message_text(formatted_tables, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Tables callback failed: {e}")
             await query.edit_message_text("❌ Ошибка при получении списка таблиц")

@@ -5,7 +5,7 @@ from typing import Optional
 class TelegramAuth(BaseModel):
     """Модель для аутентификации через Telegram"""
 
-    telegram_id: str = Field(..., description="Telegram ID пользователя")
+    telegram_id: str = Field(..., min_length=1, description="Telegram ID пользователя")
     telegram_username: Optional[str] = Field(None, description="Telegram username")
     first_name: Optional[str] = Field(None, description="Имя пользователя")
     last_name: Optional[str] = Field(None, description="Фамилия пользователя")

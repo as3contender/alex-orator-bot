@@ -93,11 +93,6 @@ class APIClient:
         """Получение информации о колонках таблицы"""
         return await self._make_request("GET", f"/api/v1/database/tables/{table_name}/columns")
 
-    async def execute_natural_query(self, query: str) -> Dict[str, Any]:
-        """Выполнение запроса на естественном языке"""
-        data = {"natural_query": query}
-        return await self._make_request("POST", "/api/v1/database/natural-query", json=data)
-
     async def execute_sql_query(self, sql: str) -> Dict[str, Any]:
         """Выполнение SQL запроса"""
         data = {"sql": sql}

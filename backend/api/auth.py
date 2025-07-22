@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from loguru import logger
 
-from models.auth import UserLogin, UserCreate, UserResponse, TokenResponse
+from models.auth import UserLogin, UserCreate
+from models.orator import UserResponse, TokenResponse
 from models.telegram import TelegramAuth
 from services.security import security_service
 from services.user_service import user_service

@@ -4,33 +4,35 @@ services:
   # PostgreSQL для приложения
   app-db:
     image: postgres:15-alpine
-    container_name: cloverdashbot-app-db-local
+    container_name: alex-orator-app-db-local
     environment:
       POSTGRES_DB: app_db
-      POSTGRES_USER: cloverdashbot
-      POSTGRES_PASSWORD: local_password
+      POSTGRES_USER: alex_orator
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - app-db-data-local:/var/lib/postgresql/data
+      - alex-orator-app-db-data-local:/var/lib/postgresql/data
+      - ./deployment/init-orator-app-db.sql:/docker-entrypoint-initdb.d/init-orator-app-db.sql
     ports:
-      - "5432:5432"
+      - "5434:5432"
     networks:
-      - cloverdashbot-local-network
+      - alex-orator-local-network
     restart: unless-stopped
 
   # PostgreSQL для пользовательских данных
   data-db:
     image: postgres:15-alpine
-    container_name: cloverdashbot-data-db-local
+    container_name: alex-orator-data-db-local
     environment:
       POSTGRES_DB: data_db
-      POSTGRES_USER: cloverdashbot
-      POSTGRES_PASSWORD: local_password
+      POSTGRES_USER: alex_orator
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - data-db-data-local:/var/lib/postgresql/data
+      - alex-orator-data-db-data-local:/var/lib/postgresql/data
+      - ./deployment/init-data-db.sql:/docker-entrypoint-initdb.d/init-data-db.sql
     ports:
-      - "5433:5432"
+      - "5435:5432"
     networks:
-      - cloverdashbot-local-network
+      - alex-orator-local-network
     restart: unless-stopped
 
   # Backend API (для разработки)
@@ -38,53 +40,56 @@ services:
     build: 
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cloverdashbot-backend-local
+    container_name: alex-orator-backend-local
     environment:
       - DEBUG=true
       - OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_api_key_here}
-      - APP_DATABASE_URL=postgresql://cloverdashbot:local_password@app-db:5432/app_db
-      - DATA_DATABASE_URL=postgresql://cloverdashbot:local_password@data-db:5432/data_db
-      - JWT_SECRET_KEY=local-jwt-secret-key
-      - SECRET_KEY=local-secret-key
+      - APP_DATABASE_URL=${APP_DATABASE_URL}
+      - DATA_DATABASE_URL=${DATA_DATABASE_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
     ports:
       - "8000:8000"
     depends_on:
       - app-db
       - data-db
     networks:
-      - cloverdashbot-local-network
+      - alex-orator-local-network
     restart: unless-stopped
     volumes:
       - ./backend:/app
       - ./logs:/app/logs
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Telegram Bot (для разработки)
-  telegram-bot:
+  # Alex Orator Bot (для разработки)
+  orator-bot:
     build: 
       context: ./telegram-bot
       dockerfile: Dockerfile
-    container_name: cloverdashbot-telegram-local
+    container_name: alex-orator-bot-local
     environment:
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-your_telegram_bot_token_here}
+      - BOT_TOKEN=${BOT_TOKEN:-your_telegram_bot_token_here}
       - BACKEND_URL=http://backend:8000
+      - API_TIMEOUT=30
+      - API_RETRY_ATTEMPTS=3
+      - API_RETRY_DELAY=1
       - LOG_LEVEL=DEBUG
     depends_on:
       - backend
     networks:
-      - cloverdashbot-local-network
+      - alex-orator-local-network
     restart: unless-stopped
     volumes:
       - ./telegram-bot:/app
       - ./logs:/app/logs
-    command: python bot.py
+    command: python orator_bot.py
 
 volumes:
-  app-db-data-local:
+  alex-orator-app-db-data-local:
     driver: local
-  data-db-data-local:
+  alex-orator-data-db-data-local:
     driver: local
 
 networks:
-  cloverdashbot-local-network:
+  alex-orator-local-network:
     driver: bridge 

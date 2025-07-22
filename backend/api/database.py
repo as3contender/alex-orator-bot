@@ -4,7 +4,6 @@ from typing import List, Dict, Any
 
 from models.database import TableInfo, ColumnInfo, QueryRequest, QueryResponse
 from services.data_database import data_database_service
-from services.llm_service import llm_service
 from services.security import security_service
 
 router = APIRouter()
@@ -52,33 +51,6 @@ async def execute_query(
     except Exception as e:
         logger.error(f"Query execution error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Query execution failed")
-
-
-@router.post("/natural-query", response_model=QueryResponse)
-async def natural_language_query(
-    query_request: QueryRequest, current_user_id: str = Depends(security_service.get_current_user_id)
-):
-    """Обработка запроса на естественном языке"""
-    try:
-        # Получение схемы базы данных
-        tables_info = await data_database_service.get_database_schema()
-
-        # Генерация SQL через LLM
-        sql_result = await llm_service.generate_sql_query(
-            user_query=query_request.natural_query,
-            tables_info=tables_info,
-            user_language="ru",  # TODO: получить из настроек пользователя
-        )
-
-        # Выполнение сгенерированного SQL
-        result = await data_database_service.execute_query(sql_result.sql)
-
-        logger.info(f"User {current_user_id} made natural query: {query_request.natural_query}")
-
-        return QueryResponse(data=result, sql=sql_result.sql, explanation=sql_result.explanation)
-    except Exception as e:
-        logger.error(f"Natural query error: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Natural language query failed")
 
 
 @router.get("/sample-data/{table_name}")

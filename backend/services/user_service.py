@@ -1,7 +1,7 @@
 from typing import Optional
 from loguru import logger
 
-from models.auth import User, UserCreate
+from models.orator import User
 from models.user_settings import UserSettings, UserSettingsUpdate
 from services.app_database import app_database_service
 from services.security import security_service
@@ -9,53 +9,17 @@ from services.security import security_service
 
 class UserService:
     async def authenticate_user(self, username: str, password: str) -> Optional[User]:
-        """Аутентификация пользователя"""
+        """Аутентификация пользователя по username и паролю (не используется в Telegram боте)"""
         try:
             user = await app_database_service.get_user_by_username(username)
             if not user:
                 return None
 
-            if not security_service.verify_password(password, user.hashed_password):
-                return None
-
-            if not user.is_active:
-                return None
-
-            return user
+            # Для Telegram бота пароли не используются
+            return None
         except Exception as e:
             logger.error(f"User authentication failed: {e}")
             return None
-
-    async def create_user(self, user_data: UserCreate) -> User:
-        """Создание нового пользователя"""
-        try:
-            # Проверяем, не существует ли уже пользователь
-            existing_user = await app_database_service.get_user_by_username(user_data.username)
-            if existing_user:
-                raise ValueError("Username already exists")
-
-            existing_email = await app_database_service.get_user_by_username(user_data.email)
-            if existing_email:
-                raise ValueError("Email already exists")
-
-            # Хешируем пароль
-            hashed_password = security_service.get_password_hash(user_data.password)
-
-            # Создаем пользователя
-            user_dict = user_data.dict()
-            user_dict["hashed_password"] = hashed_password
-
-            user = await app_database_service.create_user(user_dict)
-
-            # Создаем настройки по умолчанию
-            await self.create_default_settings(str(user.id))
-
-            logger.info(f"New user created: {user.id}")
-            return user
-
-        except Exception as e:
-            logger.error(f"User creation failed: {e}")
-            raise
 
     async def get_or_create_telegram_user(
         self, telegram_id: str, username: str = None, first_name: str = None, last_name: str = None
@@ -84,7 +48,6 @@ class UserService:
                 "telegram_username": username,
                 "first_name": first_name,
                 "last_name": last_name,
-                "hashed_password": security_service.get_password_hash(f"telegram_{telegram_id}"),  # Временный пароль
             }
 
             user = await app_database_service.create_telegram_user(telegram_data)

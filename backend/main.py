@@ -6,6 +6,9 @@ from loguru import logger
 
 from config.settings import settings
 from api.routes import router as api_router
+from services.app_database import app_database_service
+from services.data_database import data_database_service
+from services.orator_database import orator_db
 
 # Настройка логирования
 logger.add("logs/backend.log", rotation="1 day", retention="7 days", level="INFO")
@@ -41,10 +44,29 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def startup_event():
     logger.info("Starting CloverdashBot Backend...")
 
+    # Инициализация подключений к базам данных
+    try:
+        await app_database_service.connect()
+        await data_database_service.connect()
+        await orator_db.connect()
+        logger.info("Database connections established")
+    except Exception as e:
+        logger.error(f"Failed to connect to databases: {e}")
+        raise
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down CloverdashBot Backend...")
+
+    # Закрытие подключений к базам данных
+    try:
+        await app_database_service.disconnect()
+        await data_database_service.disconnect()
+        await orator_db.disconnect()
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Failed to close database connections: {e}")
 
 
 if __name__ == "__main__":

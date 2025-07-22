@@ -4,7 +4,7 @@ from loguru import logger
 from datetime import datetime
 
 from config.settings import settings
-from models.auth import User
+from models.orator import User
 from models.user_settings import UserSettings
 
 
@@ -155,15 +155,14 @@ class AppDatabaseService:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO users (telegram_id, telegram_username, first_name, last_name, hashed_password)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO users (telegram_id, username, first_name, last_name)
+                VALUES ($1, $2, $3, $4)
                 RETURNING *
             """,
                 telegram_data["telegram_id"],
                 telegram_data.get("telegram_username"),
                 telegram_data.get("first_name"),
                 telegram_data.get("last_name"),
-                telegram_data["hashed_password"],
             )
             return User(**dict(row))
 

@@ -8,11 +8,6 @@ class Settings(BaseSettings):
     debug: bool = False
     secret_key: str = "your-secret-key-change-in-production"
 
-    # OpenAI
-    openai_api_key: str = ""
-    openai_model: str = "gpt-3.5-turbo"
-    openai_max_tokens: int = 1000
-    openai_temperature: float = 0.1
 
     # Базы данных
     app_database_url: str = "postgresql://user:pass@localhost:5432/app_db"
@@ -36,6 +31,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Игнорировать лишние переменные
 
 
 # Создание экземпляра настроек
