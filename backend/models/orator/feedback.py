@@ -10,7 +10,6 @@ class SessionFeedback(BaseEntity):
 
     pair_id: str
     from_user_id: str
-    to_user_id: str
     feedback_text: str = Field(..., min_length=3, max_length=1000)
     rating: FeedbackRating
 
@@ -31,3 +30,14 @@ class SessionFeedbackResponse(BaseModel):
     feedback_text: str
     rating: FeedbackRating
     created_at: datetime
+
+    @classmethod
+    def from_session_feedback(cls, feedback: dict) -> "SessionFeedbackResponse":
+        """Создать ответ из данных обратной связи"""
+        return cls(
+            id=str(feedback["id"]),
+            from_user_name=feedback.get("from_user_name", "Пользователь"),
+            feedback_text=feedback["feedback_text"],
+            rating=feedback["rating"],
+            created_at=feedback["created_at"],
+        )

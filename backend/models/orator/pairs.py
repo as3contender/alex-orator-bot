@@ -30,6 +30,24 @@ class UserPairResponse(BaseModel):
     confirmed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     has_feedback: bool = False
+    is_initiator: bool = False
+
+    @classmethod
+    def from_user_pair(cls, user_pair: dict) -> "UserPairResponse":
+        """Создать ответ из данных пары пользователей"""
+        return cls(
+            id=str(user_pair["id"]),
+            partner_id=str(user_pair["partner_id"]),
+            partner_name=user_pair["partner_name"],
+            week_start_date=user_pair["week_start_date"],
+            week_end_date=user_pair["week_end_date"],
+            status=user_pair["status"],
+            created_at=user_pair["created_at"],
+            confirmed_at=user_pair.get("confirmed_at"),
+            cancelled_at=user_pair.get("cancelled_at"),
+            has_feedback=user_pair.get("has_feedback", False),
+            is_initiator=user_pair.get("is_initiator", False),
+        )
 
 
 class PairConfirmation(BaseModel):

@@ -132,7 +132,6 @@ class OratorDatabaseService:
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     pair_id UUID REFERENCES user_pairs(id) ON DELETE CASCADE,
                     from_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-                    to_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
                     feedback_text TEXT NOT NULL,
                     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -168,6 +167,24 @@ class OratorDatabaseService:
                 # Ограничение уже существует
                 pass
 
+            # Таблица тем
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS topics (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    topic_id VARCHAR(100) UNIQUE NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    parent_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+                    level INTEGER DEFAULT 1,
+                    sort_order INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
             # Создание индексов для оптимизации
             await conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_week_registrations_user_id ON week_registrations(user_id)"
@@ -187,6 +204,9 @@ class OratorDatabaseService:
 
             # Инициализация настроек по умолчанию
             await self._initialize_default_settings(conn)
+
+            # Инициализация тем
+            await self._initialize_topics(conn)
 
     async def _initialize_bot_content(self, conn):
         """Инициализация базового контента бота"""
@@ -294,6 +314,112 @@ class OratorDatabaseService:
                 setting["value"],
                 setting["description"],
             )
+
+    async def _initialize_topics(self, conn):
+        """Инициализация тем по умолчанию"""
+        topics_data = [
+            # Группа 1
+            {"topic_id": "group1", "name": "Группа 1", "level": 1, "sort_order": 1},
+            {
+                "topic_id": "group1_level1",
+                "name": "Группа 1 - Уровень 1",
+                "parent_id": "group1",
+                "level": 2,
+                "sort_order": 1,
+            },
+            {
+                "topic_id": "group1_level2",
+                "name": "Группа 1 - Уровень 2",
+                "parent_id": "group1",
+                "level": 2,
+                "sort_order": 2,
+            },
+            {
+                "topic_id": "group1_level3",
+                "name": "Группа 1 - Уровень 3",
+                "parent_id": "group1",
+                "level": 2,
+                "sort_order": 3,
+            },
+            # Группа 2
+            {"topic_id": "group2", "name": "Группа 2", "level": 1, "sort_order": 2},
+            {
+                "topic_id": "group2_level1",
+                "name": "Группа 2 - Уровень 1",
+                "parent_id": "group2",
+                "level": 2,
+                "sort_order": 1,
+            },
+            {
+                "topic_id": "group2_level2",
+                "name": "Группа 2 - Уровень 2",
+                "parent_id": "group2",
+                "level": 2,
+                "sort_order": 2,
+            },
+            {
+                "topic_id": "group2_level3",
+                "name": "Группа 2 - Уровень 3",
+                "parent_id": "group2",
+                "level": 2,
+                "sort_order": 3,
+            },
+            # Группа 3
+            {"topic_id": "group3", "name": "Группа 3", "level": 1, "sort_order": 3},
+            {
+                "topic_id": "group3_level1",
+                "name": "Группа 3 - Уровень 1",
+                "parent_id": "group3",
+                "level": 2,
+                "sort_order": 1,
+            },
+            {
+                "topic_id": "group3_level2",
+                "name": "Группа 3 - Уровень 2",
+                "parent_id": "group3",
+                "level": 2,
+                "sort_order": 2,
+            },
+            {
+                "topic_id": "group3_level3",
+                "name": "Группа 3 - Уровень 3",
+                "parent_id": "group3",
+                "level": 2,
+                "sort_order": 3,
+            },
+        ]
+
+        for topic in topics_data:
+            # Сначала вставляем родительские темы
+            if "parent_id" not in topic:
+                await conn.execute(
+                    """
+                    INSERT INTO topics (topic_id, name, level, sort_order, is_active)
+                    VALUES ($1, $2, $3, $4, TRUE)
+                    ON CONFLICT (topic_id) DO NOTHING
+                    """,
+                    topic["topic_id"],
+                    topic["name"],
+                    topic["level"],
+                    topic["sort_order"],
+                )
+            else:
+                # Для дочерних тем сначала получаем ID родителя
+                parent_id = await conn.fetchval("SELECT id FROM topics WHERE topic_id = $1", topic["parent_id"])
+
+                if parent_id:
+                    await conn.execute(
+                        """
+                        INSERT INTO topics (topic_id, name, parent_id, level, sort_order, is_active)
+                        VALUES ($1, $2, $3, $4, $5, TRUE)
+                        ON CONFLICT (topic_id) DO NOTHING
+                        """,
+                        topic["topic_id"],
+                        topic["name"],
+                        parent_id,
+                        topic["level"],
+                        topic["sort_order"],
+                    )
 
     # Методы для работы с пользователями
     async def get_user_profile(self, user_id: UUID) -> Optional[Dict[str, Any]]:
@@ -511,7 +637,7 @@ class OratorDatabaseService:
             return [row["topic_path"] for row in rows]
 
     # Методы для работы с парами
-    async def create_user_pair(self, user1_id: UUID, user2_id: UUID, registration_id: UUID) -> UUID:
+    async def create_user_pair(self, user1_id: UUID, user2_id: UUID, registration_id: UUID) -> Optional[Dict[str, Any]]:
         """Создать пару пользователей"""
         async with self.pool.acquire() as conn:
             pair_id = await conn.fetchval(
@@ -524,11 +650,28 @@ class OratorDatabaseService:
                 user2_id,
                 registration_id,
             )
-            # Возвращаем созданную пару
+
+            # Возвращаем полную информацию о созданной паре
             row = await conn.fetchrow(
                 """
-                SELECT * FROM user_pairs WHERE id = $1
+                SELECT 
+                    up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                    CASE 
+                        WHEN up.user1_id = $1 THEN up.user2_id
+                        ELSE up.user1_id
+                    END as partner_id,
+                    CASE 
+                        WHEN up.user1_id = $1 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
+                        ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
+                    END as partner_name,
+                    wr.week_start_date, wr.week_end_date
+                FROM user_pairs up
+                JOIN week_registrations wr ON up.week_registration_id = wr.id
+                JOIN users u1 ON up.user1_id = u1.id
+                JOIN users u2 ON up.user2_id = u2.id
+                WHERE up.id = $2
                 """,
+                user1_id,
                 pair_id,
             )
             return dict(row) if row else None
@@ -567,6 +710,50 @@ class OratorDatabaseService:
             )
             return dict(row) if row else None
 
+    async def cancel_user_pair(self, pair_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
+        """Отменить пару"""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE user_pairs 
+                SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP
+                WHERE id = $1 AND status IN ('pending', 'confirmed')
+                """,
+                pair_id,
+            )
+
+            if result == "UPDATE 0":
+                return None
+
+            # Возвращаем обновленную пару с полной информацией
+            row = await conn.fetchrow(
+                """
+                SELECT 
+                    up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN up.user2_id
+                        ELSE up.user1_id
+                    END as partner_id,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
+                        ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
+                    END as partner_name,
+                    wr.week_start_date, wr.week_end_date,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN TRUE
+                        ELSE FALSE
+                    END as is_initiator
+                FROM user_pairs up
+                JOIN week_registrations wr ON up.week_registration_id = wr.id
+                JOIN users u1 ON up.user1_id = u1.id
+                JOIN users u2 ON up.user2_id = u2.id
+                WHERE up.id = $1
+                """,
+                pair_id,
+                user_id,
+            )
+            return dict(row) if row else None
+
     async def get_user_pairs(self, user_id: UUID, week_start: date) -> List[Dict[str, Any]]:
         """Получить пары пользователя на неделю"""
         async with self.pool.acquire() as conn:
@@ -582,7 +769,11 @@ class OratorDatabaseService:
                         WHEN up.user1_id = $1 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                         ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
                     END as partner_name,
-                    wr.week_start_date, wr.week_end_date
+                    wr.week_start_date, wr.week_end_date,
+                    CASE 
+                        WHEN up.user1_id = $1 THEN TRUE
+                        ELSE FALSE
+                    END as is_initiator
                 FROM user_pairs up
                 JOIN week_registrations wr ON up.week_registration_id = wr.id
                 JOIN users u1 ON up.user1_id = u1.id
@@ -598,20 +789,19 @@ class OratorDatabaseService:
 
     # Методы для работы с обратной связью
     async def create_session_feedback(
-        self, pair_id: UUID, from_user_id: UUID, to_user_id: UUID, feedback_text: str, rating: int
-    ) -> UUID:
+        self, pair_id: UUID, from_user_id: UUID, feedback_text: str, rating: int
+    ) -> Optional[Dict[str, Any]]:
         """Создать обратную связь по занятию"""
         async with self.pool.acquire() as conn:
             feedback_id = await conn.fetchval(
                 """
                 INSERT INTO session_feedback 
-                (pair_id, from_user_id, to_user_id, feedback_text, rating)
-                VALUES ($1, $2, $3, $4, $5)
+                (pair_id, from_user_id, feedback_text, rating)
+                VALUES ($1, $2, $3, $4)
                 RETURNING id
                 """,
                 pair_id,
                 from_user_id,
-                to_user_id,
                 feedback_text,
                 rating,
             )
@@ -651,29 +841,30 @@ class OratorDatabaseService:
         """Получить обратную связь по пользователю"""
         async with self.pool.acquire() as conn:
             if from_user_id:
-                # Получить данную обратную связь
+                # Получить данную обратную связь (которую пользователь оставил)
                 rows = await conn.fetch(
                     """
                     SELECT 
                         sf.id, sf.pair_id, sf.feedback_text, sf.rating, sf.created_at,
-                        u.first_name || ' ' || COALESCE(u.last_name, '') as to_user_name
+                        up.partner_name
                     FROM session_feedback sf
-                    JOIN users u ON sf.to_user_id = u.id
+                    JOIN user_pairs up ON sf.pair_id = up.id
                     WHERE sf.from_user_id = $1
                     ORDER BY sf.created_at DESC
                     """,
                     from_user_id,
                 )
             elif to_user_id:
-                # Получить полученную обратную связь
+                # Получить полученную обратную связь (оставленную другими пользователями для пар, где участвует данный пользователь)
                 rows = await conn.fetch(
                     """
                     SELECT 
                         sf.id, sf.pair_id, sf.feedback_text, sf.rating, sf.created_at,
                         u.first_name || ' ' || COALESCE(u.last_name, '') as from_user_name
                     FROM session_feedback sf
+                    JOIN user_pairs up ON sf.pair_id = up.id
                     JOIN users u ON sf.from_user_id = u.id
-                    WHERE sf.to_user_id = $1
+                    WHERE (up.user1_id = $1 OR up.user2_id = $1) AND sf.from_user_id != $1
                     ORDER BY sf.created_at DESC
                     """,
                     to_user_id,
@@ -685,45 +876,39 @@ class OratorDatabaseService:
 
     # Методы для работы с контентом
     async def get_topic_tree(self) -> Dict[str, Any]:
-        """Получить дерево тем"""
-        # TODO: Реализовать получение дерева тем из базы данных
-        # Пока возвращаем статичную структуру
-        return {
-            "topics": [
-                {
-                    "id": "delivery",
-                    "name": "Подача",
-                    "children": [
-                        {
-                            "id": "speech-topics-1",
-                            "name": "Темы речи уровень 1",
-                            "path": "Подача - Темы речи уровень 1",
-                        },
-                        {
-                            "id": "speech-topics-2",
-                            "name": "Темы речи уровень 2",
-                            "path": "Подача - Темы речи уровень 2",
-                        },
-                    ],
-                },
-                {
-                    "id": "voice",
-                    "name": "Голос",
-                    "children": [
-                        {"id": "intonation", "name": "Интонация", "path": "Голос - Интонация"},
-                        {"id": "diction", "name": "Дикция", "path": "Голос - Дикция"},
-                    ],
-                },
-                {
-                    "id": "gestures",
-                    "name": "Жесты",
-                    "children": [
-                        {"id": "basic-gestures", "name": "Базовые", "path": "Жесты - Базовые"},
-                        {"id": "advanced-gestures", "name": "Продвинутые", "path": "Жесты - Продвинутые"},
-                    ],
-                },
-            ]
-        }
+        """Получить дерево тем из базы данных"""
+        async with self.pool.acquire() as conn:
+            # Получаем все темы, отсортированные по уровню и порядку
+            rows = await conn.fetch(
+                """
+                SELECT id, topic_id, name, description, parent_id, level, sort_order
+                FROM topics 
+                WHERE is_active = TRUE
+                ORDER BY level, sort_order
+                """
+            )
+
+            # Создаем словарь для быстрого поиска тем по ID
+            topics_dict = {}
+            root_topics = []
+
+            # Сначала создаем все темы
+            for row in rows:
+                topic = {"id": row["topic_id"], "name": row["name"], "description": row["description"], "children": []}
+                topics_dict[row["id"]] = topic
+
+                # Если это корневая тема (без родителя), добавляем в корневой список
+                if row["parent_id"] is None:
+                    root_topics.append(topic)
+
+            # Теперь добавляем дочерние темы к родителям
+            for row in rows:
+                if row["parent_id"] is not None and row["parent_id"] in topics_dict:
+                    parent_topic = topics_dict[row["parent_id"]]
+                    child_topic = topics_dict[row["id"]]
+                    parent_topic["children"].append(child_topic)
+
+            return {"topics": root_topics, "language": "ru"}
 
     async def get_bot_content(self, content_key: str, language: str = "ru") -> Optional[str]:
         """Получить контент бота"""

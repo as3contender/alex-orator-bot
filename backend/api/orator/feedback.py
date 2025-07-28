@@ -18,7 +18,6 @@ async def create_feedback(
         feedback = await orator_db.create_session_feedback(
             pair_id=feedback_data.pair_id,
             from_user_id=current_user_id,
-            to_user_id=feedback_data.to_user_id,
             feedback_text=feedback_data.feedback_text,
             rating=feedback_data.rating,
         )

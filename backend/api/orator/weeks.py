@@ -23,10 +23,13 @@ async def register_for_week(
                 detail="Cannot register again. Please provide feedback for previous sessions first.",
             )
 
+        # Получаем информацию о неделе на основе типа
+        week_info = await orator_db.get_week_info(registration.week_type.value)
+
         week_registration = await orator_db.create_week_registration(
             user_id=current_user_id,
-            week_start=registration.week_start_date,
-            week_end=registration.week_end_date,
+            week_start=week_info["week_start_date"],
+            week_end=week_info["week_end_date"],
             preferred_time=registration.preferred_time_msk,
             selected_topics=registration.selected_topics,
         )

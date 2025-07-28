@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
+from datetime import datetime
 
 from models.orator import MatchRequest, MatchResponse
 from services.security import security_service
@@ -14,8 +15,11 @@ async def find_candidates(
 ):
     """Найти кандидатов для пары"""
     try:
+        # Преобразуем строку даты в объект date
+        week_start_date = datetime.strptime(match_request.week_start_date, "%Y-%m-%d").date()
+
         candidates = await matching_service.find_candidates(
-            user_id=current_user_id, week_start_date=match_request.week_start_date, limit=match_request.limit
+            user_id=current_user_id, week_start=week_start_date, limit=match_request.limit
         )
         return MatchResponse(candidates=candidates)
     except Exception as e:

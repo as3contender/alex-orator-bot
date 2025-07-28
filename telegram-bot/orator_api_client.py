@@ -150,6 +150,10 @@ class OratorAPIClient:
         """Подтвердить пару"""
         return await self._make_request("POST", f"/api/v1/orator/pairs/{pair_id}/confirm")
 
+    async def cancel_pair(self, pair_id: str) -> Dict[str, Any]:
+        """Отменить пару"""
+        return await self._make_request("POST", f"/api/v1/orator/pairs/{pair_id}/cancel")
+
     async def get_user_pairs(self) -> List[Dict[str, Any]]:
         """Получить пары пользователя"""
         return await self._make_request("GET", "/api/v1/orator/pairs")

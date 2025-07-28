@@ -146,10 +146,21 @@ class OratorCommandHandlers:
             # Получаем дерево тем
             topic_tree = await self.api_client.get_topic_tree()
 
-            # Создаем кнопки для выбора тем (упрощенная версия)
+            # Создаем кнопки для выбора тем с новой логикой
             keyboard = []
-            for category in topic_tree.get("categories", [])[:6]:  # Ограничиваем количество
-                keyboard.append([InlineKeyboardButton(category["name"], callback_data=f"topic_{category['id']}")])
+            for topic in topic_tree.get("topics", []):
+                # Проверяем, есть ли дочерние элементы
+                has_children = len(topic.get("children", [])) > 0
+                if has_children:
+                    # Если есть дочерние элементы, показываем их
+                    keyboard.append(
+                        [InlineKeyboardButton(f"📁 {topic['name']}", callback_data=f"topic_group_{topic['id']}")]
+                    )
+                else:
+                    # Если нет дочерних элементов, это конечная тема
+                    keyboard.append(
+                        [InlineKeyboardButton(f"✅ {topic['name']}", callback_data=f"topic_select_{topic['id']}")]
+                    )
 
             keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="cancel")])
 

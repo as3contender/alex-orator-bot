@@ -69,3 +69,19 @@ async def get_user_pairs(current_user_id: str = Depends(security_service.get_cur
     except Exception as e:
         logger.error(f"Get user pairs error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get user pairs")
+
+
+@router.post("/{pair_id}/cancel", response_model=UserPairResponse)
+async def cancel_pair(pair_id: str, current_user_id: str = Depends(security_service.get_current_user_id)):
+    """Отменить пару"""
+    try:
+        user_pair = await orator_db.cancel_user_pair(pair_id, current_user_id)
+        if not user_pair:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found")
+
+        return UserPairResponse.from_user_pair(user_pair)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Cancel pair error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to cancel pair")

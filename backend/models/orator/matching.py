@@ -19,11 +19,11 @@ class CandidateInfo(BaseModel):
 class MatchRequest(BaseModel):
     """Запрос на подбор пары"""
 
-    week_registration_id: str
+    week_start_date: str
+    limit: int = 3
 
 
 class MatchResponse(BaseModel):
     """Ответ с кандидатами для подбора"""
 
     candidates: List[CandidateInfo]
-    total_candidates: int

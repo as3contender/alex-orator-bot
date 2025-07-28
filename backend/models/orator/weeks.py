@@ -44,6 +44,20 @@ class WeekRegistrationResponse(BaseModel):
     cancelled_at: Optional[datetime] = None
     selected_topics: List[str] = Field(default=[], description="Список выбранных тем")
 
+    @classmethod
+    def from_week_registration(cls, registration: dict):
+        """Создание ответа из объекта регистрации"""
+        return cls(
+            id=str(registration["id"]),
+            week_start_date=registration["week_start_date"],
+            week_end_date=registration["week_end_date"],
+            preferred_time_msk=registration["preferred_time_msk"],
+            status=registration["status"],
+            created_at=registration["created_at"],
+            cancelled_at=registration.get("cancelled_at"),
+            selected_topics=registration.get("selected_topics", []),
+        )
+
 
 class WeekInfo(BaseModel):
     """Информация о неделе"""

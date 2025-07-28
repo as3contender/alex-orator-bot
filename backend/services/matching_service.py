@@ -34,14 +34,17 @@ class MatchingService:
             )
 
             if not all_candidates:
+                logger.info(f"No candidates found for user {user_id} on week {week_start}")
                 return []
+
+            logger.info(f"Found {len(all_candidates)} initial candidates for user {user_id}")
 
             # Рассчитываем score для каждого кандидата
             scored_candidates = []
             for candidate in all_candidates:
                 score = await self._calculate_match_score(user_info, candidate)
                 candidate_info = CandidateInfo(
-                    user_id=candidate["user_id"],
+                    user_id=str(candidate["user_id"]),
                     name=candidate["name"],
                     gender=candidate.get("gender"),
                     total_sessions=candidate["total_sessions"],
@@ -102,6 +105,7 @@ class MatchingService:
         try:
             async with self.orator_db.pool.acquire() as conn:
                 # Получаем пользователей с активными регистрациями, исключая тех, у кого уже max_pairs_per_user+ пар
+                # И исключая тех, с кем уже есть пара в статусе pending или confirmed
                 rows = await conn.fetch(
                     """
                     SELECT 
@@ -124,6 +128,17 @@ class MatchingService:
                         AND wr2.week_start_date = $1
                         AND up2.status IN ('pending', 'confirmed')
                     ) < $3
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM user_pairs up3
+                        JOIN week_registrations wr3 ON up3.week_registration_id = wr3.id
+                        WHERE wr3.week_start_date = $1
+                        AND up3.status IN ('pending', 'confirmed')
+                        AND (
+                            (up3.user1_id = $2 AND up3.user2_id = u.id)
+                            OR (up3.user1_id = u.id AND up3.user2_id = $2)
+                        )
+                    )
                     """,
                     week_start,
                     exclude_user_id,
@@ -383,6 +398,44 @@ class MatchingService:
         except Exception as e:
             logger.error(f"Error getting candidate stats: {e}")
             return {"total_registrations": 0, "total_pairs": 0, "confirmed_pairs": 0, "confirmation_rate": 0}
+
+    async def check_existing_pairs(self, user_id: UUID, week_start: date) -> List[Dict[str, Any]]:
+        """Проверить существующие пары пользователя на неделю"""
+        try:
+            async with self.orator_db.pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT 
+                        up.id as pair_id,
+                        up.status,
+                        up.created_at,
+                        CASE 
+                            WHEN up.user1_id = $1 THEN up.user2_id
+                            ELSE up.user1_id
+                        END as partner_id,
+                        u.first_name || ' ' || COALESCE(u.last_name, '') as partner_name
+                    FROM user_pairs up
+                    JOIN week_registrations wr ON up.week_registration_id = wr.id
+                    JOIN users u ON (
+                        CASE 
+                            WHEN up.user1_id = $1 THEN up.user2_id
+                            ELSE up.user1_id
+                        END = u.id
+                    )
+                    WHERE wr.week_start_date = $2
+                    AND (up.user1_id = $1 OR up.user2_id = $1)
+                    AND up.status IN ('pending', 'confirmed')
+                    ORDER BY up.created_at DESC
+                    """,
+                    user_id,
+                    week_start,
+                )
+
+                return [dict(row) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Error checking existing pairs for user {user_id}: {e}")
+            return []
 
 
 # Создаем экземпляр сервиса
