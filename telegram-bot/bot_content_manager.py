@@ -7,6 +7,19 @@ from loguru import logger
 from orator_api_client import OratorAPIClient
 
 
+def format_text_for_telegram(text: str) -> str:
+    """Форматирует текст для корректного отображения в Telegram HTML режиме"""
+    if not text:
+        return text
+
+    # Заменяем переносы строк на HTML переносы
+    # Двойные переносы \n\n становятся <br><br> для абзацев
+    # Одинарные переносы \n становятся <br> для строк
+    formatted_text = text.replace("\n\n", "<br><br>").replace("\n", "<br>")
+
+    return formatted_text
+
+
 class BotContentManager:
     def __init__(self, api_client: OratorAPIClient):
         self.api_client = api_client
@@ -28,9 +41,11 @@ class BotContentManager:
         try:
             # Список ключей контента для загрузки
             content_keys = [
-                "приветственное_сообщение",
+                "welcome_message",
                 "хочешь_тренироваться_на_этой_неделе_второе_сообщение",
                 "обратная_связь_для_регистрации_на_следующую_неделю",
+                "chat_rules",
+                "help_message",
             ]
 
             # Добавляем упражнения (они загружаются по мере необходимости)
@@ -46,8 +61,10 @@ class BotContentManager:
                         content_text = response.get("content_text", "")
 
                         if content_text:
-                            self.content_cache[language][key] = content_text
-                            logger.info(f"Loaded content for key '{key}' in language '{language}'")
+                            # Форматируем текст для Telegram при загрузке
+                            formatted_text = format_text_for_telegram(content_text)
+                            self.content_cache[language][key] = formatted_text
+                            logger.info(f"Loaded and formatted content for key '{key}' in language '{language}'")
                         else:
                             logger.warning(f"No content found for key '{key}' in language '{language}'")
 
@@ -82,14 +99,68 @@ class BotContentManager:
         content = language_cache.get(key)
 
         if content:
-            return content
+            return content  # Уже отформатирован при загрузке
         else:
-            logger.warning(f"Content not found for key '{key}' in language '{language}'")
+            # Пытаемся загрузить контент на лету (например, упражнения)
+            logger.info(f"Content not in cache, trying to load '{key}' for language '{language}'")
+            return self._load_content_on_demand(key, language)
+
+    def _load_content_on_demand(self, key: str, language: str = "ru") -> str:
+        """Загрузить контент по требованию (для упражнений и других динамических ключей)"""
+        try:
+            import asyncio
+
+            # Создаем новый event loop если его нет
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            # Загружаем контент синхронно
+            if loop.is_running():
+                # Если loop уже запущен, создаем task
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self._async_load_content_on_demand(key, language))
+                    return future.result()
+            else:
+                # Если loop не запущен, используем run
+                return loop.run_until_complete(self._async_load_content_on_demand(key, language))
+
+        except Exception as e:
+            logger.error(f"Error loading content on demand for key '{key}': {e}")
+            return f"Контент не найден: {key}"
+
+    async def _async_load_content_on_demand(self, key: str, language: str = "ru") -> str:
+        """Асинхронная загрузка контента по требованию"""
+        try:
+            response = await self.api_client.get_bot_content(key)
+            content_text = response.get("content_text", "")
+
+            if content_text:
+                # Форматируем текст для Telegram
+                formatted_text = format_text_for_telegram(content_text)
+
+                # Кэшируем для будущего использования
+                if language not in self.content_cache:
+                    self.content_cache[language] = {}
+                self.content_cache[language][key] = formatted_text
+
+                logger.info(f"Loaded and cached content on demand for key '{key}' in language '{language}'")
+                return formatted_text
+            else:
+                logger.warning(f"No content found for key '{key}' in language '{language}'")
+                return f"Контент не найден: {key}"
+
+        except Exception as e:
+            logger.error(f"Error in async load content on demand for key '{key}': {e}")
             return f"Контент не найден: {key}"
 
     def get_welcome_message(self, language: str = "ru") -> str:
         """Получить приветственное сообщение"""
-        return self.get_content("приветственное_сообщение", language)
+        return self.get_content("welcome_message", language)
 
     def get_registration_message(self, language: str = "ru") -> str:
         """Получить сообщение о регистрации"""

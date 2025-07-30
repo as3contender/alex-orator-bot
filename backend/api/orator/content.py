@@ -2,13 +2,10 @@
 API эндпоинты для контента бота
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends
 from loguru import logger
 
-from services.orator_database import OratorDatabaseService
-from services.auth_service import get_current_user
-from models.orator import User
+from services.orator_database import orator_db
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -17,8 +14,6 @@ router = APIRouter(prefix="/content", tags=["content"])
 async def get_bot_content(
     content_key: str,
     language: str = "ru",
-    current_user: User = Depends(get_current_user),
-    orator_db: OratorDatabaseService = Depends(),
 ):
     """
     Получить контент бота по ключу
@@ -26,8 +21,6 @@ async def get_bot_content(
     Args:
         content_key: Ключ контента (например, 'приветственное_сообщение')
         language: Язык контента (по умолчанию 'ru')
-        current_user: Текущий пользователь
-        orator_db: Сервис базы данных
 
     Returns:
         Контент бота
@@ -51,8 +44,6 @@ async def get_bot_content(
 async def get_exercise_by_topic(
     topic_id: str,
     language: str = "ru",
-    current_user: User = Depends(get_current_user),
-    orator_db: OratorDatabaseService = Depends(),
 ):
     """
     Получить упражнение по теме
@@ -60,8 +51,6 @@ async def get_exercise_by_topic(
     Args:
         topic_id: ID темы (например, 'речевая_импровизация_уровень_1_задание_1')
         language: Язык контента (по умолчанию 'ru')
-        current_user: Текущий пользователь
-        orator_db: Сервис базы данных
 
     Returns:
         Упражнение для указанной темы
@@ -88,8 +77,6 @@ async def get_exercise_by_topic(
 async def get_bot_message(
     message_key: str,
     language: str = "ru",
-    current_user: User = Depends(get_current_user),
-    orator_db: OratorDatabaseService = Depends(),
 ):
     """
     Получить сообщение бота по ключу
@@ -97,8 +84,6 @@ async def get_bot_message(
     Args:
         message_key: Ключ сообщения (например, 'приветственное_сообщение')
         language: Язык контента (по умолчанию 'ru')
-        current_user: Текущий пользователь
-        orator_db: Сервис базы данных
 
     Returns:
         Сообщение бота

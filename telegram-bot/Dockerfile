@@ -21,4 +21,4 @@ COPY . .
 RUN mkdir -p logs
 
 # Команда запуска
-CMD ["python", "bot.py"] 
+CMD ["python", "orator_bot.py"] 

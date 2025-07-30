@@ -52,7 +52,7 @@ async def _show_topics_menu_after_registration(self, query, language: str):
     try:
         # Получаем дерево тем
         topic_tree = await self.api_client.get_topic_tree()
-        logger.info(f"Topic tree received after registration: {topic_tree}")
+        #logger.info(f"Topic tree received after registration: {topic_tree}")
     except Exception as e:
         logger.error(f"Error getting topic tree after registration: {e}")
         await query.edit_message_text("❌ Ошибка при загрузке тем. Попробуйте позже.")
@@ -101,7 +101,7 @@ async def _show_topics_menu(self, query, language: str, parent_id: str = None):
     try:
         # Получаем дерево тем
         topic_tree = await self.api_client.get_topic_tree()
-        logger.info(f"Topic tree received: {topic_tree}")
+        #logger.info(f"Topic tree received: {topic_tree}")
     except Exception as e:
         logger.error(f"Error getting topic tree: {e}")
         await query.edit_message_text("❌ Ошибка при загрузке тем. Попробуйте позже.")

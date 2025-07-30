@@ -5,8 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from loguru import logger
 
 from config import BOT_TOKEN, BACKEND_URL
-from orator_handlers import OratorCommandHandlers
-from orator_callback_handler import OratorCallbackHandler
+from handlers import CommandHandler as OratorCommandHandler, CallbackHandler as OratorCallbackHandler
 from error_handler import ErrorHandler
 from orator_api_client import OratorAPIClient
 from bot_content_manager import BotContentManager
@@ -20,7 +19,7 @@ class AlexOratorBot:
         self.application = Application.builder().token(BOT_TOKEN).build()
         self.api_client = OratorAPIClient(BACKEND_URL)
         self.content_manager = BotContentManager(self.api_client)
-        self.command_handlers = OratorCommandHandlers(self.api_client)
+        self.command_handler = OratorCommandHandler(self.api_client, self.content_manager)
         self.callback_handler = OratorCallbackHandler(self.api_client, self.content_manager)
         self.error_handler = ErrorHandler()
 
@@ -31,27 +30,16 @@ class AlexOratorBot:
         """Настройка обработчиков команд и сообщений"""
 
         # Основные команды
-        self.application.add_handler(CommandHandler("start", self.command_handlers.start_command))
-        self.application.add_handler(CommandHandler("help", self.command_handlers.help_command))
-        self.application.add_handler(CommandHandler("profile", self.command_handlers.profile_command))
-        self.application.add_handler(CommandHandler("register", self.command_handlers.register_command))
-        self.application.add_handler(CommandHandler("topics", self.command_handlers.topics_command))
-        self.application.add_handler(CommandHandler("find", self.command_handlers.find_candidates_command))
-        self.application.add_handler(CommandHandler("pairs", self.command_handlers.pairs_command))
-        self.application.add_handler(CommandHandler("feedback", self.command_handlers.feedback_command))
-        self.application.add_handler(CommandHandler("stats", self.command_handlers.stats_command))
-        self.application.add_handler(CommandHandler("cancel", self.command_handlers.cancel_registration_command))
-
-        # Быстрые команды для смены языка
-        self.application.add_handler(CommandHandler("en", self.command_handlers.quick_language_en))
-        self.application.add_handler(CommandHandler("ru", self.command_handlers.quick_language_ru))
+        self.application.add_handler(CommandHandler("start", self.command_handler.start_command))
+        self.application.add_handler(CommandHandler("help", self.command_handler.help_command))
+        self.application.add_handler(CommandHandler("menu", self.command_handler.menu_command))
 
         # Обработка callback запросов (кнопки)
         self.application.add_handler(CallbackQueryHandler(self.callback_handler.handle_callback))
 
-        # Обработка текстовых сообщений (для выбора тем, времени и т.д.)
+        # Обработка текстовых сообщений
         self.application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.command_handlers.handle_text_message)
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.command_handler.handle_text_message)
         )
 
     def _setup_error_handler(self):
