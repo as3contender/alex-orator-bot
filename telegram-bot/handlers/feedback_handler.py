@@ -27,7 +27,7 @@ class FeedbackHandler(OratorBaseHandler):
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            get_text("feedback_welcome", language), reply_markup=reply_markup, parse_mode="HTML"
+            get_text("feedback_welcome", language), reply_markup=reply_markup, parse_mode="MarkdownV2"
         )
 
     async def handle_feedback_type_callback(self, query, callback_data: str, language: str):
@@ -55,13 +55,13 @@ class FeedbackHandler(OratorBaseHandler):
                 feedback_text += f"{i}. {feedback.get('feedback_text', 'Нет текста')}\n"
         else:
             # Неизвестный тип обратной связи
-            await query.edit_message_text("❌ Неизвестный тип обратной связи", parse_mode="HTML")
+            await query.edit_message_text("❌ Неизвестный тип обратной связи", parse_mode="MarkdownV2")
             return
 
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="feedback")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(feedback_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(feedback_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def handle_pair_feedback(self, query, callback_data: str, language: str):
         """Обработка обратной связи по паре"""
@@ -79,7 +79,7 @@ class FeedbackHandler(OratorBaseHandler):
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.edit_message_text(
-            "Оцените вашу тренировку с партнером:", reply_markup=reply_markup, parse_mode="HTML"
+            "Оцените вашу тренировку с партнером:", reply_markup=reply_markup, parse_mode="MarkdownV2"
         )
 
     async def handle_feedback_rating(self, query, callback_data: str, language: str):
@@ -99,7 +99,7 @@ class FeedbackHandler(OratorBaseHandler):
                     break
 
             if not target_pair:
-                await query.edit_message_text("❌ Пара не найдена", parse_mode="HTML")
+                await query.edit_message_text("❌ Пара не найдена", parse_mode="MarkdownV2")
                 return
 
             # Создаем обратную связь
@@ -110,7 +110,7 @@ class FeedbackHandler(OratorBaseHandler):
             }
             await self.api_client.create_feedback(feedback_data)
 
-            await query.edit_message_text(f"✅ Спасибо за обратную связь! Оценка: {rating} ⭐", parse_mode="HTML")
+            await query.edit_message_text(f"✅ Спасибо за обратную связь! Оценка: {rating} ⭐", parse_mode="MarkdownV2")
         except Exception as e:
             logger.error(f"Create feedback error: {e}")
-            await query.edit_message_text("❌ Ошибка при создании обратной связи", parse_mode="HTML")
+            await query.edit_message_text("❌ Ошибка при создании обратной связи", parse_mode="MarkdownV2")

@@ -57,7 +57,7 @@ class TopicsHandler(OratorBaseHandler):
         keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="register")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def show_registration_topics_submenu(self, query, language: str, parent_id: str):
         """Показать подменю тем в процессе регистрации (с префиксом reg_)"""
@@ -107,7 +107,7 @@ class TopicsHandler(OratorBaseHandler):
         keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="register")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def handle_registration_topic_selection(self, query, callback_data: str, language: str, registration_handler):
         """Обработка выбора темы в процессе регистрации"""
@@ -121,7 +121,7 @@ class TopicsHandler(OratorBaseHandler):
             logger.info(f"TOPICS: Topic found - ID: {topic_id}, Name: {topic_name}")
         except Exception as e:
             logger.error(f"TOPICS: Error getting topic tree: {e}")
-            await query.edit_message_text("❌ Ошибка при загрузке тем", parse_mode="HTML")
+            await query.edit_message_text("❌ Ошибка при загрузке тем", parse_mode="MarkdownV2")
             return False
 
         if topic_name:
@@ -142,13 +142,13 @@ class TopicsHandler(OratorBaseHandler):
                 message_text += f"🔍 Ищем кандидатов для пары..."
 
                 # Показываем сообщение с заданием
-                await query.edit_message_text(message_text, parse_mode="HTML")
+                await query.edit_message_text(message_text, parse_mode="MarkdownV2")
                 return True  # Успешная регистрация
             else:
-                await query.edit_message_text("❌ Ошибка при создании регистрации", parse_mode="HTML")
+                await query.edit_message_text("❌ Ошибка при создании регистрации", parse_mode="MarkdownV2")
                 return False
         else:
-            await query.edit_message_text("❌ Ошибка: тема не найдена", parse_mode="HTML")
+            await query.edit_message_text("❌ Ошибка: тема не найдена", parse_mode="MarkdownV2")
             return False
 
     async def show_topics_menu(self, query, language: str, parent_id: str = None):
@@ -200,7 +200,7 @@ class TopicsHandler(OratorBaseHandler):
         keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="cancel")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def handle_topic_selection(self, query, callback_data: str, language: str):
         """Обработка выбора конкретной темы"""
@@ -221,10 +221,10 @@ class TopicsHandler(OratorBaseHandler):
             message_text += f"🔍 Ищем кандидатов для пары..."
 
             # Показываем сообщение с заданием
-            await query.edit_message_text(message_text, parse_mode="HTML")
+            await query.edit_message_text(message_text, parse_mode="MarkdownV2")
             return True  # Успешный выбор темы
         else:
-            await query.edit_message_text("❌ Ошибка: тема не найдена", parse_mode="HTML")
+            await query.edit_message_text("❌ Ошибка: тема не найдена", parse_mode="MarkdownV2")
             return False
 
     async def start_candidate_search(self, query, language: str):
@@ -237,7 +237,7 @@ class TopicsHandler(OratorBaseHandler):
 
             if not registration:
                 logger.warning("SEARCH: No registration found - user needs to register first")
-                await query.edit_message_text("❌ Сначала зарегистрируйтесь на неделю", parse_mode="HTML")
+                await query.edit_message_text("❌ Сначала зарегистрируйтесь на неделю", parse_mode="MarkdownV2")
                 return
 
             # Ищем кандидатов
@@ -254,7 +254,7 @@ class TopicsHandler(OratorBaseHandler):
                 await query.edit_message_text(
                     "❌ Кандидаты не найдены. Попробуйте позже или измените критерии поиска.",
                     reply_markup=reply_markup,
-                    parse_mode="HTML",
+                    parse_mode="MarkdownV2",
                 )
                 return
 
@@ -280,7 +280,7 @@ class TopicsHandler(OratorBaseHandler):
             await query.edit_message_text(
                 f"🎯 Найдено {len(candidates)} кандидатов для пары:\n\nВыберите кандидата:",
                 reply_markup=reply_markup,
-                parse_mode="HTML",
+                parse_mode="MarkdownV2",
             )
 
         except Exception as e:
@@ -291,5 +291,5 @@ class TopicsHandler(OratorBaseHandler):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                "❌ Ошибка при поиске кандидатов. Попробуйте позже.", reply_markup=reply_markup, parse_mode="HTML"
+                "❌ Ошибка при поиске кандидатов. Попробуйте позже.", reply_markup=reply_markup, parse_mode="MarkdownV2"
             )

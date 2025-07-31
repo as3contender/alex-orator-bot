@@ -28,11 +28,13 @@ class CommandHandler(OratorBaseHandler):
             if self.content_manager and self.content_manager.is_content_loaded():
                 # Приветственное сообщение (уже отформатировано)
                 welcome_text = self.content_manager.get_content("welcome_message", language)
+                logger.info(f"Welcome text (first 100 chars): {welcome_text[:100]}")
 
                 # Сообщение о тренировке (уже отформатировано)
                 training_text = self.content_manager.get_content(
                     "хочешь_тренироваться_на_этой_неделе_второе_сообщение", language
                 )
+                logger.info(f"Training text (first 100 chars): {training_text[:100]}")
 
             else:
                 # Fallback к статическим текстам
@@ -43,7 +45,7 @@ class CommandHandler(OratorBaseHandler):
                 training_text = get_text("хочешь_тренироваться_на_этой_неделе_второе_сообщение", language)
 
             # Отправляем приветственное сообщение
-            await update.message.reply_text(welcome_text, parse_mode="HTML")
+            await update.message.reply_text(welcome_text, parse_mode="MarkdownV2")
 
             # Отправляем сообщение о тренировке с кнопками
             keyboard = [
@@ -66,7 +68,7 @@ class CommandHandler(OratorBaseHandler):
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(training_text, reply_markup=reply_markup, parse_mode="HTML")
+            await update.message.reply_text(training_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
             logger.info(f"User {user.id} started Alex Orator Bot")
 
@@ -90,7 +92,7 @@ class CommandHandler(OratorBaseHandler):
                 # Fallback к статическому тексту
                 help_text = get_text("help_message", language)
 
-            await update.message.reply_text(help_text, parse_mode="HTML")
+            await update.message.reply_text(help_text, parse_mode="MarkdownV2")
 
         except Exception as e:
             logger.error(f"Help command error: {e}")
@@ -136,7 +138,7 @@ class CommandHandler(OratorBaseHandler):
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(training_text, reply_markup=reply_markup, parse_mode="HTML")
+            await update.message.reply_text(training_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
             logger.info(f"User {user.id} opened menu via /menu command")
 
@@ -153,11 +155,10 @@ class CommandHandler(OratorBaseHandler):
 
             # Пока просто отвечаем стандартным сообщением с подсказкой о меню
             await update.message.reply_text(
-                "Используйте команды бота для навигации:<br>"
-                "• /menu - главное меню<br>"
-                "• /help - справка<br>"
-                "• /start - перезапуск бота",
-                parse_mode="HTML",
+                "Используйте команды бота для навигации:\n"
+                "• /menu - главное меню\n"
+                "• /help - справка\n"
+                "• /start - перезапуск бота"
             )
 
         except Exception as e:

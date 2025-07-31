@@ -168,7 +168,7 @@ class CallbackHandler(OratorBaseHandler):
         await query.edit_message_text(
             get_text("find_candidates_success", language).format(count=len(candidates)),
             reply_markup=reply_markup,
-            parse_mode="HTML",
+            parse_mode="MarkdownV2",
         )
 
     async def _handle_profile_callback(self, query, language: str):
@@ -185,7 +185,7 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(profile_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(profile_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def _handle_stats_callback(self, query, language: str):
         """Обработка статистики"""
@@ -203,7 +203,7 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(stats_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(stats_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def _handle_help_callback(self, query, language: str):
         """Обработка помощи"""
@@ -212,7 +212,7 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
     async def _handle_cancel_callback(self, query, language: str):
         """Обработка отмены"""
@@ -242,4 +242,4 @@ class CallbackHandler(OratorBaseHandler):
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("Выберите действие:", reply_markup=reply_markup, parse_mode="HTML")
+        await query.edit_message_text("Выберите действие:", reply_markup=reply_markup, parse_mode="MarkdownV2")

@@ -13,9 +13,9 @@ def format_text_for_telegram(text: str) -> str:
         return text
 
     # Заменяем переносы строк на HTML переносы
-    # Двойные переносы \n\n становятся <br><br> для абзацев
-    # Одинарные переносы \n становятся <br> для строк
-    formatted_text = text.replace("\n\n", "<br><br>").replace("\n", "<br>")
+    # Двойные переносы \n\n становятся <br/><br/> для абзацев
+    # Одинарные переносы \n становятся <br/> для строк
+    formatted_text = text.replace("\n\n", "<br/><br/>").replace("\n", "<br/>")
 
     return formatted_text
 

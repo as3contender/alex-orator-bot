@@ -10,14 +10,17 @@ from orator_translations import get_text
 
 
 def format_text_for_telegram(text: str) -> str:
-    """Форматирует текст для корректного отображения в Telegram HTML режиме"""
+    """Форматирует текст для корректного отображения в Telegram Markdown режиме"""
     if not text:
         return text
 
-    # Заменяем переносы строк на HTML переносы
-    # Двойные переносы \n\n становятся <br><br> для абзацев
-    # Одинарные переносы \n становятся <br> для строк
-    formatted_text = text.replace("\n\n", "<br><br>").replace("\n", "<br>")
+    # Заменяем переносы строк на Markdown форматирование
+    # Двойные переносы \n\n остаются для абзацев
+    # Одинарные переносы \n остаются как есть
+    # Экранируем специальные символы Markdown
+    formatted_text = (
+        text.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[").replace("]", "\\]")
+    )
 
     return formatted_text
 
