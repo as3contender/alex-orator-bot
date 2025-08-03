@@ -7,11 +7,17 @@ from telegram.ext import ContextTypes
 from loguru import logger
 
 from .base_handler import OratorBaseHandler
+from .feedback_handler import FeedbackHandler
 from orator_translations import get_text, get_button_text
+from typing import Dict, List, Any
 
 
 class CommandHandler(OratorBaseHandler):
     """Обработчик команд бота"""
+
+    def __init__(self, api_client, content_manager=None):
+        super().__init__(api_client, content_manager)
+        self.feedback_handler = FeedbackHandler(api_client, content_manager)
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /start"""
@@ -45,30 +51,22 @@ class CommandHandler(OratorBaseHandler):
                 training_text = get_text("хочешь_тренироваться_на_этой_неделе_второе_сообщение", language)
 
             # Отправляем приветственное сообщение
-            await update.message.reply_text(welcome_text, parse_mode="MarkdownV2")
+            await update.message.reply_text(welcome_text)
 
             # Отправляем сообщение о тренировке с кнопками
             keyboard = [
                 [
                     InlineKeyboardButton(get_button_text("register", language), callback_data="register"),
-                    InlineKeyboardButton(get_button_text("topics", language), callback_data="topics"),
+                    InlineKeyboardButton("📋 Задания", callback_data="mytasks"),
                 ],
                 [
-                    InlineKeyboardButton(get_button_text("find", language), callback_data="find"),
-                    InlineKeyboardButton(get_button_text("pairs", language), callback_data="pairs"),
-                ],
-                [
-                    InlineKeyboardButton(get_button_text("feedback", language), callback_data="feedback"),
-                    InlineKeyboardButton(get_button_text("profile", language), callback_data="profile"),
-                ],
-                [
-                    InlineKeyboardButton(get_button_text("stats", language), callback_data="stats"),
-                    InlineKeyboardButton(get_button_text("help", language), callback_data="help"),
+                    InlineKeyboardButton("🔍 Поиск кандидатов", callback_data="find"),
+                    InlineKeyboardButton("👥 Мои пары", callback_data="pairs"),
                 ],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(training_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            await update.message.reply_text(training_text, reply_markup=reply_markup)
 
             logger.info(f"User {user.id} started Alex Orator Bot")
 
@@ -92,7 +90,7 @@ class CommandHandler(OratorBaseHandler):
                 # Fallback к статическому тексту
                 help_text = get_text("help_message", language)
 
-            await update.message.reply_text(help_text, parse_mode="MarkdownV2")
+            await update.message.reply_text(help_text)
 
         except Exception as e:
             logger.error(f"Help command error: {e}")
@@ -121,29 +119,61 @@ class CommandHandler(OratorBaseHandler):
             keyboard = [
                 [
                     InlineKeyboardButton(get_button_text("register", language), callback_data="register"),
-                    InlineKeyboardButton(get_button_text("topics", language), callback_data="topics"),
+                    InlineKeyboardButton("📋 Задания", callback_data="mytasks"),
                 ],
                 [
-                    InlineKeyboardButton(get_button_text("find", language), callback_data="find"),
-                    InlineKeyboardButton(get_button_text("pairs", language), callback_data="pairs"),
-                ],
-                [
-                    InlineKeyboardButton(get_button_text("feedback", language), callback_data="feedback"),
-                    InlineKeyboardButton(get_button_text("profile", language), callback_data="profile"),
-                ],
-                [
-                    InlineKeyboardButton(get_button_text("stats", language), callback_data="stats"),
-                    InlineKeyboardButton(get_button_text("help", language), callback_data="help"),
+                    InlineKeyboardButton("🔍 Поиск кандидатов", callback_data="find"),
+                    InlineKeyboardButton("👥 Мои пары", callback_data="pairs"),
                 ],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(training_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            await update.message.reply_text(training_text, reply_markup=reply_markup)
 
             logger.info(f"User {user.id} opened menu via /menu command")
 
         except Exception as e:
             logger.error(f"Menu command error: {e}")
+            await update.message.reply_text(get_text("error_unknown", "ru"))
+
+    async def mytasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /mytasks - показывает упражнения по зарегистрированной теме"""
+        try:
+            if not await self._authenticate_user(update):
+                await update.message.reply_text(get_text("error_authentication", "ru"))
+                return
+
+            user = update.effective_user
+            language = await self._get_user_language(update)
+
+            # Используем общую логику из базового класса
+            tasks_data, error_message = await self._get_user_tasks(user.id, language)
+
+            if error_message:
+                await update.message.reply_text(error_message)
+                return
+
+            # Отправляем заголовок
+            await update.message.reply_text(tasks_data["header"])
+
+            # Отправляем каждое упражнение отдельным сообщением
+            for exercise in tasks_data["exercises"]:
+                exercise_text = exercise["content_text"]
+                formatted_text = f"{exercise_text}"
+
+                # Разбиваем длинные сообщения (Telegram лимит ~4096 символов)
+                if len(formatted_text) > 4000:
+                    # Отправляем по частям
+                    parts = [formatted_text[j : j + 4000] for j in range(0, len(formatted_text), 4000)]
+                    for part in parts:
+                        await update.message.reply_text(part)
+                else:
+                    await update.message.reply_text(formatted_text)
+
+            logger.info(f"User {user.id} requested mytasks, found {len(tasks_data['exercises'])} exercises")
+
+        except Exception as e:
+            logger.error(f"MyTasks command error: {e}")
             await update.message.reply_text(get_text("error_unknown", "ru"))
 
     async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -153,12 +183,19 @@ class CommandHandler(OratorBaseHandler):
                 await update.message.reply_text(get_text("error_authentication", "ru"))
                 return
 
-            # Пока просто отвечаем стандартным сообщением с подсказкой о меню
+            # Проверяем, может ли feedback_handler обработать это сообщение
+            if hasattr(self, "feedback_handler"):
+                feedback_handled = await self.feedback_handler.handle_text_message(update, context)
+                if feedback_handled:
+                    return  # Сообщение было обработано feedback_handler'ом
+
+            # Если сообщение не обработано, отвечаем стандартным сообщением с подсказкой о меню
             await update.message.reply_text(
                 "Используйте команды бота для навигации:\n"
                 "• /menu - главное меню\n"
                 "• /help - справка\n"
-                "• /start - перезапуск бота"
+                "• /start - перезапуск бота\n"
+                "• /mytasks - ваши задания на эту неделю"
             )
 
         except Exception as e:

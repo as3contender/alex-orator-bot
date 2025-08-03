@@ -40,7 +40,7 @@ class RegistrationHandler(OratorBaseHandler):
             registration_text += f"🕐 Время: {current_registration.get('preferred_time_msk', 'Не указано')}\n"
             registration_text += f"📝 Статус: {current_registration.get('status', 'Активна')}"
 
-            await query.edit_message_text(registration_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            await query.edit_message_text(registration_text, reply_markup=reply_markup)
             return
 
         # Создаем кнопки для выбора недели
@@ -58,7 +58,7 @@ class RegistrationHandler(OratorBaseHandler):
 
         # Получаем сообщение о регистрации из базы данных
         registration_message = await self._get_bot_content("chat_rules", language)
-        await query.edit_message_text(registration_message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(registration_message, reply_markup=reply_markup)
 
     async def handle_week_selection(self, query, callback_data: str, language: str):
         """Обработка выбора недели"""
@@ -99,8 +99,7 @@ class RegistrationHandler(OratorBaseHandler):
         week_text = "Текущая неделя" if week_type == "current" else "Следующая неделя"
         await query.edit_message_text(
             f"Выбрана неделя: {week_text}\n\nВыберите предпочитаемое время:",
-            reply_markup=reply_markup,
-            parse_mode="MarkdownV2",
+            reply_markup=reply_markup
         )
 
     async def handle_time_selection(self, query, callback_data: str, language: str):
@@ -117,26 +116,26 @@ class RegistrationHandler(OratorBaseHandler):
         message_text = f"✅ Время выбрано: {selected_time}\n\nТеперь выберите тему для тренировки:"
 
         # Показываем сообщение и возвращаем True для перехода к темам
-        await query.edit_message_text(message_text, parse_mode="MarkdownV2")
+        await query.edit_message_text(message_text, )
         return True  # Переходим к выбору тем
 
     async def create_registration_with_topic(self, topic_id: str):
         """Создание регистрации с выбранной темой"""
         logger.info(f"REGISTRATION: Starting registration creation with topic: {topic_id}")
-        
+
         # Используем сохраненные данные
         week_type = getattr(self, "selected_week", "current")
         selected_time = getattr(self, "selected_time", "10:00")
-        
+
         logger.info(f"REGISTRATION: Retrieved saved data - week: {week_type}, time: {selected_time}")
-        
-        # Создаем регистрацию с выбранной темой
+
+        # Создаем регистрацию с выбранной темой (topic_id уже содержит уровень)
         registration_data = {
             "week_type": week_type,
             "preferred_time_msk": selected_time,
             "selected_topics": [topic_id],
         }
-        
+
         logger.info(f"REGISTRATION: Registration data prepared: {registration_data}")
 
         try:
@@ -159,8 +158,7 @@ class RegistrationHandler(OratorBaseHandler):
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 "✅ Регистрация успешно отменена!\n\nТеперь вы можете зарегистрироваться снова.",
-                reply_markup=reply_markup,
-                parse_mode="MarkdownV2",
+                reply_markup=reply_markup
             )
         except Exception as e:
             logger.error(f"Cancel registration error: {e}")
@@ -169,5 +167,6 @@ class RegistrationHandler(OratorBaseHandler):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                "❌ Ошибка при отмене регистрации. Попробуйте позже.", reply_markup=reply_markup, parse_mode="MarkdownV2"
+                "❌ Ошибка при отмене регистрации. Попробуйте позже.",
+                reply_markup=reply_markup
             )

@@ -50,7 +50,7 @@ class QueryHandler:
                 )
 
                 # Отправляем результат
-                await processing_message.edit_text(formatted_result, parse_mode="MarkdownV2")
+                await processing_message.edit_text(formatted_result, )
 
                 logger.info(f"Query processed successfully for user {user.id}: {query_text[:50]}...")
 
@@ -137,7 +137,7 @@ class QueryHandler:
         try:
             # Форматируем результат
             formatted_result = format_query_results(None, language, True, True, 20)
-            await query.edit_message_text(formatted_result, parse_mode="MarkdownV2")
+            await query.edit_message_text(formatted_result, )
         except Exception as e:
             logger.error(f"Sample query failed: {e}")
             await query.edit_message_text("❌ Ошибка при выполнении примера запроса")
@@ -149,7 +149,7 @@ class QueryHandler:
         try:
             # Форматируем результат
             formatted_data = format_query_results(None, language, True, True, 10)
-            await query.edit_message_text(formatted_data, parse_mode="MarkdownV2")
+            await query.edit_message_text(formatted_data, )
         except Exception as e:
             logger.error(f"Sample table failed: {e}")
             await query.edit_message_text("❌ Ошибка при получении примера данных")
@@ -157,7 +157,7 @@ class QueryHandler:
     async def _handle_help_callback(self, query, language: str):
         """Обработка callback справки"""
         help_text = get_text("help_message", language)
-        await query.edit_message_text(help_text, parse_mode="MarkdownV2")
+        await query.edit_message_text(help_text, )
 
     async def _handle_tables_callback(self, query, language: str):
         """Обработка callback списка таблиц"""
@@ -169,7 +169,7 @@ class QueryHandler:
 
             # Форматируем результат
             formatted_tables = format_query_results(None, language, True, True, 0)
-            await query.edit_message_text(formatted_tables, parse_mode="MarkdownV2")
+            await query.edit_message_text(formatted_tables, )
         except Exception as e:
             logger.error(f"Tables callback failed: {e}")
             await query.edit_message_text("❌ Ошибка при получении списка таблиц")

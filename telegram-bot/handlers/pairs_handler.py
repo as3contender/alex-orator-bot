@@ -39,7 +39,10 @@ class PairsHandler(OratorBaseHandler):
         keyboard.append([InlineKeyboardButton(get_button_text("back", language), callback_data="start")])
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(pairs_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(
+            pairs_text,
+            reply_markup=reply_markup,
+        )
 
     async def handle_pair_details(self, query, callback_data: str, language: str):
         """Обработка деталей пары"""
@@ -54,7 +57,9 @@ class PairsHandler(OratorBaseHandler):
                 break
 
         if not target_pair:
-            await query.edit_message_text("❌ Пара не найдена", parse_mode="MarkdownV2")
+            await query.edit_message_text(
+                "❌ Пара не найдена",
+            )
             return
 
         partner_name = target_pair.get("partner_name", "Пользователь")
@@ -81,14 +86,18 @@ class PairsHandler(OratorBaseHandler):
             # Любой может отменить
             keyboard.append([InlineKeyboardButton("❌ Отменить", callback_data=f"pair_cancel_{pair_id}")])
 
-        # Обратная связь доступна для всех статусов
-        keyboard.append([InlineKeyboardButton("💬 Обратная связь", callback_data=f"pair_feedback_{pair_id}")])
+        # Обратная связь доступна только для подтвержденных пар
+        if status == "confirmed":
+            keyboard.append([InlineKeyboardButton("💬 Обратная связь", callback_data=f"pair_feedback_{pair_id}")])
 
         # Кнопка назад
         keyboard.append([InlineKeyboardButton("⬅️ Назад к парам", callback_data="pairs")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(pair_info, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(
+            pair_info,
+            reply_markup=reply_markup,
+        )
 
     async def handle_pair_confirm(self, query, callback_data: str, language: str):
         """Обработка подтверждения пары"""
@@ -97,10 +106,18 @@ class PairsHandler(OratorBaseHandler):
         try:
             # Подтверждаем пару
             await self.api_client.confirm_pair(pair_id)
-            await query.edit_message_text("✅ Пара подтверждена!", parse_mode="MarkdownV2")
+
+            # Показываем сообщение об успехе, затем список всех пар
+            await query.edit_message_text("✅ Пара подтверждена! Загружаем ваши пары...")
+
+            # Переиспользуем логику показа пар
+            await self.handle_pairs_callback(query, language)
+
         except Exception as e:
             logger.error(f"Confirm pair error: {e}")
-            await query.edit_message_text("❌ Ошибка при подтверждении пары", parse_mode="MarkdownV2")
+            await query.edit_message_text(
+                "❌ Ошибка при подтверждении пары",
+            )
 
     async def handle_pair_cancel(self, query, callback_data: str, language: str):
         """Обработка отмены пары"""
@@ -109,10 +126,18 @@ class PairsHandler(OratorBaseHandler):
         try:
             # Отменяем пару через новый API
             await self.api_client.cancel_pair(pair_id)
-            await query.edit_message_text("❌ Пара отменена", parse_mode="MarkdownV2")
+
+            # Показываем сообщение об успехе, затем список всех пар
+            await query.edit_message_text("✅ Пара отменена! Загружаем ваши пары...")
+
+            # Переиспользуем логику показа пар
+            await self.handle_pairs_callback(query, language)
+
         except Exception as e:
             logger.error(f"Cancel pair error: {e}")
-            await query.edit_message_text("❌ Ошибка при отмене пары", parse_mode="MarkdownV2")
+            await query.edit_message_text(
+                "❌ Ошибка при отмене пары",
+            )
 
     async def handle_candidate_selection(self, query, callback_data: str, language: str):
         """Обработка выбора кандидата"""
@@ -121,7 +146,13 @@ class PairsHandler(OratorBaseHandler):
         try:
             # Создаем пару
             await self.api_client.create_pair(candidate_id)
-            await query.edit_message_text(get_text("pair_created", language), parse_mode="MarkdownV2")
+
+            # Показываем сообщение об успехе, затем список всех пар
+            await query.edit_message_text("✅ Пара создана! Загружаем ваши пары...")
+
+            # Переиспользуем логику показа пар
+            await self.handle_pairs_callback(query, language)
+
         except Exception as e:
             logger.error(f"Create pair error: {e}")
             await query.edit_message_text(get_text("pair_failed", language))

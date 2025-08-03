@@ -33,7 +33,7 @@ class TopicsHandler(OratorBaseHandler):
             await query.edit_message_text("❌ Ошибка при загрузке тем. Попробуйте позже.")
             return
 
-        # Показываем корневые темы
+        # Показываем корневые темы (Level 1)
         topics_to_show = topic_tree.get("topics", [])
 
         message_text = "Выберите тему для тренировки:"
@@ -44,12 +44,12 @@ class TopicsHandler(OratorBaseHandler):
             # Проверяем, есть ли дочерние элементы
             has_children = len(topic.get("children", [])) > 0
             if has_children:
-                # Если есть дочерние элементы, показываем их
+                # Если есть дочерние элементы, показываем их (Level 1 -> Level 2)
                 keyboard.append(
                     [InlineKeyboardButton(f"📁 {topic['name']}", callback_data=f"reg_topic_group_{topic['id']}")]
                 )
             else:
-                # Если нет дочерних элементов, это конечная тема для регистрации
+                # Если нет дочерних элементов, это конечная тема для регистрации (Level 1 -> регистрация)
                 keyboard.append(
                     [InlineKeyboardButton(f"✅ {topic['name']}", callback_data=f"reg_topic_select_{topic['id']}")]
                 )
@@ -57,10 +57,10 @@ class TopicsHandler(OratorBaseHandler):
         keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="register")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(message_text, reply_markup=reply_markup)
 
     async def show_registration_topics_submenu(self, query, language: str, parent_id: str):
-        """Показать подменю тем в процессе регистрации (с префиксом reg_)"""
+        """Показать подменю тем в процессе регистрации (Level 2)"""
         logger.info(f"TOPICS: Showing registration submenu for parent: {parent_id}")
         try:
             # Получаем дерево тем
@@ -86,69 +86,77 @@ class TopicsHandler(OratorBaseHandler):
 
         message_text = f"Выберите уровень для темы '{parent_name}':"
 
-        # Создаем кнопки для выбора тем (с префиксом reg_ для регистрации)
+        # Создаем кнопки для выбора тем (Level 2 -> регистрация)
         keyboard = []
         for topic in topics_to_show:
-            # Проверяем, есть ли дочерние элементы
-            has_children = len(topic.get("children", [])) > 0
-            if has_children:
-                # Если есть дочерние элементы, показываем их с reg_ префиксом
-                keyboard.append(
-                    [InlineKeyboardButton(f"📁 {topic['name']}", callback_data=f"reg_topic_group_{topic['id']}")]
-                )
-            else:
-                # Если нет дочерних элементов, это конечная тема для регистрации
-                keyboard.append(
-                    [InlineKeyboardButton(f"✅ {topic['name']}", callback_data=f"reg_topic_select_{topic['id']}")]
-                )
+            # На этом уровне все темы конечные для регистрации
+            keyboard.append(
+                [InlineKeyboardButton(f"✅ {topic['name']}", callback_data=f"reg_topic_select_{topic['id']}")]
+            )
 
         # Кнопка назад к корневым темам регистрации
         keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="time_back_to_topics")])
         keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="register")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(message_text, reply_markup=reply_markup)
 
     async def handle_registration_topic_selection(self, query, callback_data: str, language: str, registration_handler):
         """Обработка выбора темы в процессе регистрации"""
         topic_id = callback_data.replace("reg_topic_select_", "")
         logger.info(f"TOPICS: Registration topic selection started for topic_id: {topic_id}")
 
-        # Получаем дерево тем для поиска названия темы
+        # Получаем дерево тем для поиска информации о теме
         try:
             topic_tree = await self.api_client.get_topic_tree()
-            topic_name = self._find_topic_name(topic_tree, topic_id)
-            logger.info(f"TOPICS: Topic found - ID: {topic_id}, Name: {topic_name}")
+            topic_info = self._find_topic_by_id(topic_tree, topic_id)
+            logger.info(f"TOPICS: Topic found - ID: {topic_id}, Info: {topic_info}")
         except Exception as e:
             logger.error(f"TOPICS: Error getting topic tree: {e}")
-            await query.edit_message_text("❌ Ошибка при загрузке тем", parse_mode="MarkdownV2")
+            await query.edit_message_text("❌ Ошибка при загрузке тем")
             return False
 
-        if topic_name:
+        if topic_info:
+            topic_name = topic_info["name"]
+            topic_level = topic_info.get("level", 1)
+
             logger.info(f"TOPICS: Calling registration handler to create registration")
-            # Создаем регистрацию с выбранной темой
+            # Создаем регистрацию с выбранной темой (topic_id уже содержит уровень)
             success = await registration_handler.create_registration_with_topic(topic_id)
             logger.info(f"TOPICS: Registration creation result: {success}")
 
             if success:
-                # Получаем задание для выбранной темы
-                exercise_text = await self._get_exercise_by_topic(topic_id, language)
+                # Проверяем level темы
+                if topic_level == 2:
+                    # Для тем level=2 показываем все задания
+                    message_text = f"✅ Регистрация создана!\n\n"
+                    message_text += f"📝 Тема: {topic_name}\n\n"
+                    message_text += f"🔍 Ищем кандидатов для пары..."
+                    await query.edit_message_text(message_text)
 
-                # Формируем сообщение с заданием
-                message_text = f"✅ Регистрация создана!\n\n"
-                message_text += f"📝 Тема: {topic_name}\n\n"
-                message_text += f"<b>Задание для тренировки:</b>\n\n"
-                message_text += f"{exercise_text}\n\n"
-                message_text += f"🔍 Ищем кандидатов для пары..."
+                    # Показываем все задания
+                    await self._show_all_exercises_for_topic(query, topic_id, topic_name, language)
+                    return True
+                else:
+                    # Для остальных тем показываем одно задание как обычно
+                    # Получаем задание для выбранной темы
+                    exercise_text = await self._get_exercise_by_topic(topic_id, language)
 
-                # Показываем сообщение с заданием
-                await query.edit_message_text(message_text, parse_mode="MarkdownV2")
-                return True  # Успешная регистрация
+                    # Формируем сообщение с заданием
+                    message_text = f"✅ Регистрация создана!\n\n"
+                    message_text += f"📝 Тема: {topic_name}\n\n"
+                    message_text += f"<b>Задание для тренировки:</b>\n\n"
+                    message_text += f"{exercise_text}\n\n"
+                    message_text += f"🔍 Ищем кандидатов для пары..."
+
+                    # Показываем сообщение с заданием
+                    await query.edit_message_text(message_text)
+                    return True  # Успешная регистрация
             else:
-                await query.edit_message_text("❌ Ошибка при создании регистрации", parse_mode="MarkdownV2")
+                await query.edit_message_text("❌ Ошибка при создании регистрации")
                 return False
         else:
-            await query.edit_message_text("❌ Ошибка: тема не найдена", parse_mode="MarkdownV2")
+            await query.edit_message_text("❌ Ошибка: тема не найдена")
             return False
 
     async def show_topics_menu(self, query, language: str, parent_id: str = None):
@@ -200,31 +208,41 @@ class TopicsHandler(OratorBaseHandler):
         keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="cancel")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(message_text, reply_markup=reply_markup)
 
     async def handle_topic_selection(self, query, callback_data: str, language: str):
         """Обработка выбора конкретной темы"""
         topic_id = callback_data.replace("topic_select_", "")
 
-        # Получаем дерево тем для поиска названия темы
+        # Получаем дерево тем для поиска информации о теме
         topic_tree = await self.api_client.get_topic_tree()
-        topic_name = self._find_topic_name(topic_tree, topic_id)
+        topic_info = self._find_topic_by_id(topic_tree, topic_id)
 
-        if topic_name:
-            # Получаем задание для выбранной темы
-            exercise_text = await self._get_exercise_by_topic(topic_id, language)
+        if topic_info:
+            topic_name = topic_info["name"]
+            topic_level = topic_info.get("level", 1)
 
-            # Формируем сообщение с заданием
-            message_text = f"✅ Тема выбрана: {topic_name}\n\n"
-            message_text += f"📝 <b>Задание для тренировки:</b>\n\n"
-            message_text += f"{exercise_text}\n\n"
-            message_text += f"🔍 Ищем кандидатов для пары..."
+            # Проверяем level темы
+            if topic_level == 2:
+                # Для тем level=2 показываем все задания
+                await self._show_all_exercises_for_topic(query, topic_id, topic_name, language)
+                return True
+            else:
+                # Для остальных тем показываем одно задание как обычно
+                # Получаем задание для выбранной темы
+                exercise_text = await self._get_exercise_by_topic(topic_id, language)
 
-            # Показываем сообщение с заданием
-            await query.edit_message_text(message_text, parse_mode="MarkdownV2")
-            return True  # Успешный выбор темы
+                # Формируем сообщение с заданием
+                message_text = f"✅ Тема выбрана: {topic_name}\n\n"
+                message_text += f"📝 <b>Задание для тренировки:</b>\n\n"
+                message_text += f"{exercise_text}\n\n"
+                message_text += f"🔍 Ищем кандидатов для пары..."
+
+                # Показываем сообщение с заданием
+                await query.edit_message_text(message_text)
+                return True  # Успешный выбор темы
         else:
-            await query.edit_message_text("❌ Ошибка: тема не найдена", parse_mode="MarkdownV2")
+            await query.edit_message_text("❌ Ошибка: тема не найдена")
             return False
 
     async def start_candidate_search(self, query, language: str):
@@ -237,7 +255,7 @@ class TopicsHandler(OratorBaseHandler):
 
             if not registration:
                 logger.warning("SEARCH: No registration found - user needs to register first")
-                await query.edit_message_text("❌ Сначала зарегистрируйтесь на неделю", parse_mode="MarkdownV2")
+                await query.edit_message_text("❌ Сначала зарегистрируйтесь на неделю")
                 return
 
             # Ищем кандидатов
@@ -252,9 +270,7 @@ class TopicsHandler(OratorBaseHandler):
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await query.edit_message_text(
-                    "❌ Кандидаты не найдены. Попробуйте позже или измените критерии поиска.",
-                    reply_markup=reply_markup,
-                    parse_mode="MarkdownV2",
+                    "❌ Кандидаты не найдены. Попробуйте позже или измените критерии поиска.", reply_markup=reply_markup
                 )
                 return
 
@@ -278,9 +294,7 @@ class TopicsHandler(OratorBaseHandler):
 
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                f"🎯 Найдено {len(candidates)} кандидатов для пары:\n\nВыберите кандидата:",
-                reply_markup=reply_markup,
-                parse_mode="MarkdownV2",
+                f"🎯 Найдено {len(candidates)} кандидатов для пары:\n\nВыберите кандидата:", reply_markup=reply_markup
             )
 
         except Exception as e:
@@ -291,5 +305,58 @@ class TopicsHandler(OratorBaseHandler):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                "❌ Ошибка при поиске кандидатов. Попробуйте позже.", reply_markup=reply_markup, parse_mode="MarkdownV2"
+                "❌ Ошибка при поиске кандидатов. Попробуйте позже.", reply_markup=reply_markup
             )
+
+    def _find_topic_by_id(self, topic_tree: dict, topic_id: str) -> dict:
+        """Найти полную информацию о теме по ID в дереве тем"""
+
+        def search_in_topics(topics):
+            for topic in topics:
+                if topic["id"] == topic_id:
+                    return topic
+                # Рекурсивно ищем в дочерних темах
+                if "children" in topic:
+                    result = search_in_topics(topic["children"])
+                    if result:
+                        return result
+            return None
+
+        return search_in_topics(topic_tree.get("topics", []))
+
+    async def _show_all_exercises_for_topic(self, query, topic_id: str, topic_name: str, language: str):
+        """Показать все задания для темы level=2"""
+        try:
+            # Получаем все задания для темы
+            exercises_response = await self.api_client.get_exercises_by_topic(topic_id)
+            exercises = exercises_response.get("exercises", [])
+
+            if not exercises:
+                await query.edit_message_text(f"❌ Для темы '{topic_name}' не найдено заданий.")
+                return
+
+            # Отправляем заголовочное сообщение
+            header_text = f"✅ Тема выбрана: {topic_name}\n\n"
+            header_text += f"📚 Все задания по этой теме ({len(exercises)} шт.):\n\n"
+            await query.edit_message_text(header_text)
+
+            # Отправляем каждое задание отдельным сообщением
+            for i, exercise in enumerate(exercises, 1):
+                exercise_text = exercise.get("content_text", "Текст задания не найден")
+                formatted_text = f"📝 <b>Задание {i}/{len(exercises)}:</b>\n\n{exercise_text}"
+
+                # Разбиваем длинные сообщения (Telegram лимит ~4096 символов)
+                if len(formatted_text) > 4000:
+                    parts = [formatted_text[j : j + 4000] for j in range(0, len(formatted_text), 4000)]
+                    for part in parts:
+                        await query.message.reply_text(part)
+                else:
+                    await query.message.reply_text(formatted_text)
+
+            logger.info(
+                f"User {query.from_user.id} viewed all exercises for topic {topic_id}, found {len(exercises)} exercises"
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting exercises for topic {topic_id}: {e}")
+            await query.edit_message_text(f"❌ Ошибка при загрузке заданий для темы '{topic_name}'. Попробуйте позже.")

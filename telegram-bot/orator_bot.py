@@ -20,7 +20,7 @@ class AlexOratorBot:
         self.api_client = OratorAPIClient(BACKEND_URL)
         self.content_manager = BotContentManager(self.api_client)
         self.command_handler = OratorCommandHandler(self.api_client, self.content_manager)
-        self.callback_handler = OratorCallbackHandler(self.api_client, self.content_manager)
+        self.callback_handler = OratorCallbackHandler(self.api_client, self.content_manager, self.command_handler)
         self.error_handler = ErrorHandler()
 
         self._setup_handlers()
@@ -33,6 +33,7 @@ class AlexOratorBot:
         self.application.add_handler(CommandHandler("start", self.command_handler.start_command))
         self.application.add_handler(CommandHandler("help", self.command_handler.help_command))
         self.application.add_handler(CommandHandler("menu", self.command_handler.menu_command))
+        self.application.add_handler(CommandHandler("mytasks", self.command_handler.mytasks_command))
 
         # Обработка callback запросов (кнопки)
         self.application.add_handler(CallbackQueryHandler(self.callback_handler.handle_callback))

@@ -206,7 +206,7 @@ class OratorDatabaseService:
             await self._initialize_default_settings(conn)
 
             # Инициализация тем
-            await self._initialize_topics(conn)
+            # await self._initialize_topics(conn)
 
     async def _initialize_bot_content(self, conn):
         """Инициализация базового контента бота"""
@@ -922,6 +922,53 @@ class OratorDatabaseService:
                 language,
             )
             return row["content_text"] if row else None
+
+    async def get_exercises_by_topic(self, topic_id: str, language: str = "ru") -> List[Dict[str, Any]]:
+        """Получить все упражнения для указанной темы (дочерние элементы)"""
+        async with self.pool.acquire() as conn:
+            # Ищем все упражнения, которые начинаются с указанного topic_id
+            logger.info(f"get_exercises_by_topic: {topic_id}, {language}")
+
+            sql_query = """
+                SELECT content_key, content_text, created_at, updated_at
+                FROM bot_content bc
+                inner join (select topic_id 
+                    from topics t
+                    inner join (
+                        select id from topics t where t.topic_id = $1) q on t.parent_id = q.id) 
+                        q on bc.content_key = 'exercise_'||q.topic_id
+                    WHERE language = $2 AND is_active = TRUE
+                ORDER BY content_key
+                """
+
+            logger.info(
+                f"get_exercises_by_topic: executing SQL query with topic_id='{topic_id}', language='{language}'"
+            )
+            logger.info(f"get_exercises_by_topic: SQL query: {sql_query}")
+
+            rows = await conn.fetch(sql_query, topic_id, language)
+
+            logger.info(f"get_exercises_by_topic: query returned {len(rows)} rows")
+            logger.info(f"get_exercises_by_topic: {rows}")
+
+            exercises = []
+            for row in rows:
+                # Извлекаем номер упражнения из content_key
+                exercise_key = row["content_key"]
+                exercise_number = exercise_key.replace(f"exercise_{topic_id}_", "")
+
+                exercises.append(
+                    {
+                        "exercise_key": exercise_key,
+                        "exercise_number": exercise_number,
+                        "content_text": row["content_text"],
+                        "created_at": row["created_at"],
+                        "updated_at": row["updated_at"],
+                    }
+                )
+
+            logger.info(f"get_exercises_by_topic: returning {len(exercises)} exercises")
+            return exercises
 
     async def update_bot_content(self, content_key: str, content_text: str, language: str = "ru") -> bool:
         """Обновить контент бота"""

@@ -18,8 +18,11 @@ from orator_translations import get_text, get_button_text
 class CallbackHandler(OratorBaseHandler):
     """Главный обработчик callback'ов"""
 
-    def __init__(self, api_client, content_manager=None):
+    def __init__(self, api_client, content_manager=None, command_handler=None):
         super().__init__(api_client, content_manager)
+
+        # Ссылка на command_handler для переиспользования логики
+        self.command_handler = command_handler
 
         # Инициализируем специализированные обработчики
         self.registration_handler = RegistrationHandler(api_client, content_manager)
@@ -97,11 +100,7 @@ class CallbackHandler(OratorBaseHandler):
             elif callback_data.startswith("candidate_"):
                 await self.pairs_handler.handle_candidate_selection(query, callback_data, language)
 
-            # Обратная связь
-            elif callback_data == "feedback":
-                await self.feedback_handler.handle_feedback_callback(query, language)
-            elif callback_data.startswith("feedback_rating_"):
-                await self.feedback_handler.handle_feedback_rating(query, callback_data, language)
+            # Обратная связь (теперь только через пары)
             elif callback_data.startswith("feedback_"):
                 await self.feedback_handler.handle_feedback_type_callback(query, callback_data, language)
             elif callback_data.startswith("pair_feedback_"):
@@ -110,6 +109,8 @@ class CallbackHandler(OratorBaseHandler):
             # Остальные callback'ы
             elif callback_data == "find":
                 await self._handle_find_callback(query, language)
+            elif callback_data == "mytasks":
+                await self._handle_mytasks_callback(query, context)
             elif callback_data == "profile":
                 await self._handle_profile_callback(query, language)
             elif callback_data == "stats":
@@ -166,9 +167,7 @@ class CallbackHandler(OratorBaseHandler):
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            get_text("find_candidates_success", language).format(count=len(candidates)),
-            reply_markup=reply_markup,
-            parse_mode="MarkdownV2",
+            get_text("find_candidates_success", language).format(count=len(candidates)), reply_markup=reply_markup
         )
 
     async def _handle_profile_callback(self, query, language: str):
@@ -185,7 +184,7 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(profile_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(profile_text, reply_markup=reply_markup)
 
     async def _handle_stats_callback(self, query, language: str):
         """Обработка статистики"""
@@ -203,7 +202,7 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(stats_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(stats_text, reply_markup=reply_markup)
 
     async def _handle_help_callback(self, query, language: str):
         """Обработка помощи"""
@@ -212,7 +211,7 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(help_text, reply_markup=reply_markup)
 
     async def _handle_cancel_callback(self, query, language: str):
         """Обработка отмены"""
@@ -225,21 +224,151 @@ class CallbackHandler(OratorBaseHandler):
         keyboard = [
             [
                 InlineKeyboardButton(get_button_text("register", language), callback_data="register"),
+                InlineKeyboardButton("📋 Задания", callback_data="mytasks"),
+            ],
+            [
                 InlineKeyboardButton(get_button_text("topics", language), callback_data="topics"),
+                InlineKeyboardButton("🔍 Поиск кандидатов", callback_data="find"),
             ],
             [
-                InlineKeyboardButton(get_button_text("find", language), callback_data="find"),
-                InlineKeyboardButton(get_button_text("pairs", language), callback_data="pairs"),
-            ],
-            [
-                InlineKeyboardButton(get_button_text("feedback", language), callback_data="feedback"),
-                InlineKeyboardButton(get_button_text("profile", language), callback_data="profile"),
-            ],
-            [
-                InlineKeyboardButton(get_button_text("stats", language), callback_data="stats"),
+                InlineKeyboardButton("👥 Мои пары", callback_data="pairs"),
                 InlineKeyboardButton(get_button_text("help", language), callback_data="help"),
             ],
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("Выберите действие:", reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text("Выберите действие:", reply_markup=reply_markup)
+
+    async def _handle_mytasks_callback_old(self, query, context):
+        """Обработка кнопки 'Задания' - переиспользует логику команды /mytasks"""
+        try:
+            # Аутентификация пользователя (как в base_handler)
+            user = query.from_user
+            await self.api_client.authenticate_telegram_user(
+                telegram_id=str(user.id), username=user.username, first_name=user.first_name, last_name=user.last_name
+            )
+
+            language = await self._get_user_language_from_query(query)
+
+            # Получаем текущую регистрацию пользователя
+            registration = await self.api_client.get_current_registration()
+
+            if not registration:
+                await query.edit_message_text(
+                    "У вас нет активной регистрации на эту неделю. "
+                    "Сначала зарегистрируйтесь с помощью кнопки 'Зарегистрироваться'"
+                )
+                return
+
+            # Получаем выбранные темы
+            selected_topics = registration.get("selected_topics", [])
+
+            if not selected_topics:
+                await query.edit_message_text(
+                    "У вас нет выбранных тем для этой недели. " "Сначала выберите тему при регистрации."
+                )
+                return
+
+            # Берем первую тему
+            topic_id = selected_topics[0]
+            topic_tree = await self.api_client.get_topic_tree()
+            topic_name = self._find_topic_name(topic_tree, topic_id)
+
+            logger.info(f"Getting exercises for topic_id: {topic_id}")
+
+            # Получаем упражнения по теме
+            exercises_response = await self.api_client.get_exercises_by_topic(topic_id)
+
+            if not exercises_response or not exercises_response.get("exercises"):
+                await query.edit_message_text(
+                    f"Для темы '{topic_name}' не найдено упражнений. " "Попробуйте выбрать другую тему."
+                )
+                return
+
+            exercises = exercises_response["exercises"]
+
+            # Отправляем заголовок
+            await query.edit_message_text(
+                f"📋 Ваши задания на эту неделю\n" f"Тема: {topic_name}\n" f"Найдено упражнений: {len(exercises)}"
+            )
+
+            # Отправляем каждое упражнение отдельным сообщением
+            for i, exercise in enumerate(exercises, 1):
+                exercise_text = exercise["content_text"]
+                formatted_text = f"{exercise_text}"
+
+                # Разбиваем длинные сообщения (Telegram лимит ~4096 символов)
+                if len(formatted_text) > 4000:
+                    parts = [formatted_text[j : j + 4000] for j in range(0, len(formatted_text), 4000)]
+                    for part in parts:
+                        await query.message.reply_text(part)
+                else:
+                    await query.message.reply_text(formatted_text)
+
+            logger.info(f"User {user.id} requested mytasks via callback, found {len(exercises)} exercises")
+
+        except Exception as e:
+            logger.error(f"MyTasks callback error: {e}")
+            await query.edit_message_text("Произошла ошибка. Попробуйте команду /mytasks")
+
+    async def _get_user_language_from_query(self, query) -> str:
+        """Получение языка пользователя для callback query"""
+        try:
+            settings = await self.api_client.get_user_settings()
+            return settings.get("language", "ru")
+        except:
+            return "ru"
+
+    async def _handle_mytasks_callback(self, query, context):
+        """Обработка кнопки 'Задания' - переиспользует логику команды /mytasks"""
+        try:
+            # Аутентификация пользователя
+            if not await self._authenticate_user_from_query(query):
+                await query.edit_message_text("Ошибка аутентификации")
+                return
+
+            user = query.from_user
+            language = await self._get_user_language_from_query(query)
+
+            # Используем общую логику из базового класса
+            tasks_data, error_message = await self._get_user_tasks(user.id, language)
+
+            if error_message:
+                await query.edit_message_text(error_message)
+                return
+
+            # Отправляем заголовок
+            await query.edit_message_text(tasks_data["header"])
+
+            # Отправляем каждое упражнение отдельным сообщением
+            for exercise in tasks_data["exercises"]:
+                exercise_text = exercise["content_text"]
+                formatted_text = f"{exercise_text}"
+
+                # Разбиваем длинные сообщения (Telegram лимит ~4096 символов)
+                if len(formatted_text) > 4000:
+                    parts = [formatted_text[j : j + 4000] for j in range(0, len(formatted_text), 4000)]
+                    for part in parts:
+                        await query.message.reply_text(part)
+                else:
+                    await query.message.reply_text(formatted_text)
+
+            logger.info(
+                f"User {user.id} requested mytasks via callback, found {len(tasks_data['exercises'])} exercises"
+            )
+
+        except Exception as e:
+            logger.error(f"MyTasks callback error: {e}")
+            await query.edit_message_text("Произошла ошибка. Попробуйте команду /mytasks")
+
+    async def _authenticate_user_from_query(self, query) -> bool:
+        """Аутентификация пользователя для callback query"""
+        try:
+            user = query.from_user
+            await self.api_client.authenticate_telegram_user(
+                telegram_id=str(user.id), username=user.username, first_name=user.first_name, last_name=user.last_name
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Authentication failed for user {user.id}: {e}")
+            return False

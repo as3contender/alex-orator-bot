@@ -26,9 +26,7 @@ class FeedbackHandler(OratorBaseHandler):
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            get_text("feedback_welcome", language), reply_markup=reply_markup, parse_mode="MarkdownV2"
-        )
+        await query.edit_message_text(get_text("feedback_welcome", language), reply_markup=reply_markup)
 
     async def handle_feedback_type_callback(self, query, callback_data: str, language: str):
         """Обработка типа обратной связи"""
@@ -55,62 +53,120 @@ class FeedbackHandler(OratorBaseHandler):
                 feedback_text += f"{i}. {feedback.get('feedback_text', 'Нет текста')}\n"
         else:
             # Неизвестный тип обратной связи
-            await query.edit_message_text("❌ Неизвестный тип обратной связи", parse_mode="MarkdownV2")
+            await query.edit_message_text("❌ Неизвестный тип обратной связи")
             return
 
         keyboard = [[InlineKeyboardButton(get_button_text("back", language), callback_data="feedback")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(feedback_text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        await query.edit_message_text(feedback_text, reply_markup=reply_markup)
 
     async def handle_pair_feedback(self, query, callback_data: str, language: str):
-        """Обработка обратной связи по паре"""
+        """Обработка обратной связи по паре - запрос оценки"""
         pair_id = callback_data.replace("pair_feedback_", "")
 
-        # Показываем форму для ввода обратной связи
-        keyboard = [
-            [InlineKeyboardButton("1 ⭐", callback_data=f"feedback_rating_{pair_id}_1")],
-            [InlineKeyboardButton("2 ⭐", callback_data=f"feedback_rating_{pair_id}_2")],
-            [InlineKeyboardButton("3 ⭐", callback_data=f"feedback_rating_{pair_id}_3")],
-            [InlineKeyboardButton("4 ⭐", callback_data=f"feedback_rating_{pair_id}_4")],
-            [InlineKeyboardButton("5 ⭐", callback_data=f"feedback_rating_{pair_id}_5")],
-            [InlineKeyboardButton("⬅️ Назад", callback_data="pairs")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Сохраняем pair_id в user_data для последующего использования
+        if hasattr(query, "message") and hasattr(query.message, "reply_text"):
+            # Это callback query
+            await query.edit_message_text(
+                f"🌟 Оцените вашу тренировку с партнером от 1 до 5:\n\n"
+                f"1 - Очень плохо\n"
+                f"2 - Плохо\n"
+                f"3 - Нормально\n"
+                f"4 - Хорошо\n"
+                f"5 - Отлично\n\n"
+                f"Просто отправьте цифру от 1 до 5:"
+            )
 
-        await query.edit_message_text(
-            "Оцените вашу тренировку с партнером:", reply_markup=reply_markup, parse_mode="MarkdownV2"
-        )
+        # Сохраняем состояние пользователя
+        user_id = query.from_user.id
+        self._set_user_feedback_state(user_id, {"stage": "waiting_rating", "pair_id": pair_id, "language": language})
 
-    async def handle_feedback_rating(self, query, callback_data: str, language: str):
-        """Обработка рейтинга обратной связи"""
-        # Парсим callback_data: feedback_rating_{pair_id}_{rating}
-        parts = callback_data.split("_")
-        pair_id = parts[2]
-        rating = int(parts[3])
+    def _set_user_feedback_state(self, user_id: int, state: dict):
+        """Сохраняет состояние пользователя для процесса обратной связи"""
+        if not hasattr(self, "_user_feedback_states"):
+            self._user_feedback_states = {}
+        self._user_feedback_states[user_id] = state
+
+    def _get_user_feedback_state(self, user_id: int):
+        """Получает состояние пользователя для процесса обратной связи"""
+        if not hasattr(self, "_user_feedback_states"):
+            self._user_feedback_states = {}
+        return self._user_feedback_states.get(user_id)
+
+    def _clear_user_feedback_state(self, user_id: int):
+        """Очищает состояние пользователя"""
+        if hasattr(self, "_user_feedback_states") and user_id in self._user_feedback_states:
+            del self._user_feedback_states[user_id]
+
+    async def handle_text_message(self, update, context):
+        """Обработка текстовых сообщений для обратной связи"""
+        user_id = update.effective_user.id
+        text = update.message.text
+        state = self._get_user_feedback_state(user_id)
+
+        if not state:
+            return False  # Не наше сообщение
 
         try:
-            # Получаем информацию о паре для определения партнера
-            pairs = await self.api_client.get_user_pairs()
-            target_pair = None
-            for pair in pairs:
-                if pair.get("id") == pair_id:
-                    target_pair = pair
-                    break
+            if state["stage"] == "waiting_rating":
+                return await self._handle_rating_input(update, text, state)
+            elif state["stage"] == "waiting_comment":
+                return await self._handle_comment_input(update, text, state)
+        except Exception as e:
+            logger.error(f"Text message handler error: {e}")
+            await update.message.reply_text("❌ Произошла ошибка. Попробуйте еще раз.")
+            self._clear_user_feedback_state(user_id)
 
-            if not target_pair:
-                await query.edit_message_text("❌ Пара не найдена", parse_mode="MarkdownV2")
-                return
+        return False
 
-            # Создаем обратную связь
+    async def _handle_rating_input(self, update, text: str, state: dict):
+        """Обработка ввода оценки"""
+        try:
+            rating = int(text.strip())
+            if rating < 1 or rating > 5:
+                await update.message.reply_text("❌ Пожалуйста, введите число от 1 до 5:")
+                return True
+        except ValueError:
+            await update.message.reply_text("❌ Пожалуйста, введите число от 1 до 5:")
+            return True
+
+        # Сохраняем оценку и переходим к комментарию
+        state["rating"] = rating
+        state["stage"] = "waiting_comment"
+        self._set_user_feedback_state(update.effective_user.id, state)
+
+        await update.message.reply_text(
+            f"✅ Оценка {rating} получена!\n\n" f"Теперь напишите комментарий о тренировке (минимум 3 символа):"
+        )
+        return True
+
+    async def _handle_comment_input(self, update, text: str, state: dict):
+        """Обработка ввода комментария"""
+        comment = text.strip()
+        if len(comment) < 3:
+            await update.message.reply_text("❌ Комментарий должен содержать минимум 3 символа. Попробуйте еще раз:")
+            return True
+
+        # Сохраняем обратную связь
+        try:
             feedback_data = {
-                "pair_id": pair_id,
-                "rating": rating,
-                "feedback_text": f"Оценка: {rating} звезд",
+                "pair_id": state["pair_id"],
+                "rating": state["rating"],
+                "feedback_text": comment,
             }
             await self.api_client.create_feedback(feedback_data)
 
-            await query.edit_message_text(f"✅ Спасибо за обратную связь! Оценка: {rating} ⭐", parse_mode="MarkdownV2")
+            await update.message.reply_text(
+                f"✅ Спасибо за обратную связь!\n" f"Оценка: {state['rating']} ⭐\n" f"Комментарий: {comment}"
+            )
+
+            # Очищаем состояние
+            self._clear_user_feedback_state(update.effective_user.id)
+            return True
+
         except Exception as e:
             logger.error(f"Create feedback error: {e}")
-            await query.edit_message_text("❌ Ошибка при создании обратной связи", parse_mode="MarkdownV2")
+            await update.message.reply_text("❌ Ошибка при сохранении обратной связи")
+            self._clear_user_feedback_state(update.effective_user.id)
+            return True

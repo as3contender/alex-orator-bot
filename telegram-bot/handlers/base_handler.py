@@ -7,22 +7,7 @@ from loguru import logger
 
 from orator_api_client import OratorAPIClient
 from orator_translations import get_text
-
-
-def format_text_for_telegram(text: str) -> str:
-    """Форматирует текст для корректного отображения в Telegram Markdown режиме"""
-    if not text:
-        return text
-
-    # Заменяем переносы строк на Markdown форматирование
-    # Двойные переносы \n\n остаются для абзацев
-    # Одинарные переносы \n остаются как есть
-    # Экранируем специальные символы Markdown
-    formatted_text = (
-        text.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[").replace("]", "\\]")
-    )
-
-    return formatted_text
+from bot_content_manager import format_text_for_telegram
 
 
 class OratorBaseHandler:
@@ -104,3 +89,44 @@ class OratorBaseHandler:
             return None
 
         return search_in_topics(topic_tree.get("topics", []))
+
+    async def _get_user_tasks(self, user_id: int = None, language: str = "ru"):
+        """Общая логика получения заданий пользователя (для команды и callback)"""
+        try:
+            # Получаем текущую регистрацию пользователя
+            registration = await self.api_client.get_current_registration()
+
+            if not registration:
+                return None, "У вас нет активной регистрации на эту неделю. Сначала зарегистрируйтесь."
+
+            # Получаем выбранные темы
+            selected_topics = registration.get("selected_topics", [])
+
+            if not selected_topics:
+                return None, "У вас нет выбранных тем для этой недели. Сначала выберите тему при регистрации."
+
+            # Берем первую тему
+            topic_id = selected_topics[0]
+            topic_tree = await self.api_client.get_topic_tree()
+            topic_name = self._find_topic_name(topic_tree, topic_id)
+
+            logger.info(f"Getting exercises for topic_id: {topic_id}")
+
+            # Получаем упражнения по теме
+            exercises_response = await self.api_client.get_exercises_by_topic(topic_id)
+
+            if not exercises_response or not exercises_response.get("exercises"):
+                return None, f"Для темы '{topic_name}' не найдено упражнений. Попробуйте выбрать другую тему."
+
+            exercises = exercises_response["exercises"]
+
+            return {
+                "topic_id": topic_id,
+                "topic_name": topic_name,
+                "exercises": exercises,
+                "header": f"📋 Ваши задания на эту неделю\nТема: {topic_name}\nНайдено упражнений: {len(exercises)}",
+            }, None
+
+        except Exception as e:
+            logger.error(f"Error getting user tasks: {e}")
+            return None, "Произошла ошибка при получении заданий."

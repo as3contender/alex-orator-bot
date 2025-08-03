@@ -8,14 +8,13 @@ from orator_api_client import OratorAPIClient
 
 
 def format_text_for_telegram(text: str) -> str:
-    """Форматирует текст для корректного отображения в Telegram HTML режиме"""
+    """Форматирует текст для корректного отображения в Telegram"""
     if not text:
         return text
 
-    # Заменяем переносы строк на HTML переносы
-    # Двойные переносы \n\n становятся <br/><br/> для абзацев
-    # Одинарные переносы \n становятся <br/> для строк
-    formatted_text = text.replace("\n\n", "<br/><br/>").replace("\n", "<br/>")
+    # Заменяем HTML теги на обычные переносы строк
+    # Убираем <br/> и <br> теги, заменяя на \n
+    formatted_text = text.replace("<br/>", "\n").replace("<br>", "\n")
 
     return formatted_text
 

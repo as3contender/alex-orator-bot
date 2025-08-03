@@ -182,6 +182,10 @@ class OratorAPIClient:
         """Получить контент бота"""
         return await self._make_request("GET", f"/api/v1/orator/content/{content_key}")
 
+    async def get_exercises_by_topic(self, topic_id: str) -> Dict[str, Any]:
+        """Получить упражнения по теме"""
+        return await self._make_request("GET", f"/api/v1/orator/content/exercise/{topic_id}")
+
     # ============================================================================
     # НАСТРОЙКИ
     # ============================================================================
