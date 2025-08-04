@@ -43,7 +43,6 @@ services:
       - DEBUG=false
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - APP_DATABASE_URL=postgresql://cloverdashbot:${APP_DB_PASSWORD:-secure_password}@app-db:5432/app_db
-      - DATA_DATABASE_URL=postgresql://cloverdashbot:${DATA_DB_PASSWORD:-secure_password}@data-db:5432/data_db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-jwt-secret-key-change-in-production}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
     ports:

@@ -1,472 +1,247 @@
-# CloverdashBot - Развертывание
+# Alex Orator Bot - Deployment Guide
 
-Инструкции по развертыванию CloverdashBot в различных окружениях.
+Автоматический деплой **Alex Orator Bot** на удаленный сервер с помощью Docker и docker-compose.
 
 ## 🚀 Быстрый старт
 
-### 1. Подготовка окружения
+### 1. Подготовка конфигурации
 
 ```bash
-# Клонирование репозитория
-git clone <your-repo> cloverdashbot
-cd cloverdashbot
+# Скопируйте пример конфигурации
+cp deployment/deploy.env.example deployment/deploy.env
 
-# Настройка проекта
-make setup
+# Отредактируйте конфигурацию
+nano deployment/deploy.env
 ```
 
-### 2. Конфигурация
+### 2. Запуск деплоя
 
-Отредактируйте файлы конфигурации:
+```bash
+# Перейдите в директорию deployment
+cd deployment
 
-#### Backend (.env)
-```env
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key_here
+# Сделайте скрипт исполняемым
+chmod +x deploy_alex_orator.sh
 
-# Базы данных
-APP_DATABASE_URL=postgresql://cloverdashbot:password@localhost:5432/app_db
-DATA_DATABASE_URL=postgresql://cloverdashbot:password@localhost:5433/data_db
+# Запустите полный деплой
+./deploy_alex_orator.sh
+```
+
+## 📋 Конфигурация
+
+### Обязательные параметры в `deploy.env`:
+
+```bash
+# Сервер
+REMOTE_HOST=your-server.com
+REMOTE_USER=ubuntu
+SSH_KEY_PATH=~/.ssh/your-key
 
 # Безопасность
-SECRET_KEY=your-secret-key-here
-JWT_SECRET_KEY=your-jwt-secret-key-here
+SECRET_KEY=your-generated-secret-key
+JWT_SECRET_KEY=your-generated-jwt-secret
+APP_DB_PASSWORD=secure_password
+DATA_DB_PASSWORD=secure_password
+
+# Telegram Bot
+TELEGRAM_TOKEN=your_bot_token_from_botfather
 ```
 
-#### Telegram Bot (.env)
-```env
-TELEGRAM_TOKEN=your_telegram_bot_token
-BACKEND_URL=http://localhost:8000
-```
-
-### 3. Запуск
+### Генерация секретных ключей:
 
 ```bash
-# Локальная разработка
-make local-up
+# Генерация SECRET_KEY
+python3 -c "import secrets, base64; print('SECRET_KEY=' + base64.b64encode(secrets.token_bytes(32)).decode())"
 
-# Production
-make production-up
+# Генерация JWT_SECRET_KEY  
+python3 -c "import secrets, base64; print('JWT_SECRET_KEY=' + base64.b64encode(secrets.token_bytes(32)).decode())"
 ```
 
-## 🐳 Docker развертывание
+## 🛠️ Варианты деплоя
 
-### Локальная разработка
-
+### Полный деплой (все сервисы):
 ```bash
-# Запуск всех сервисов
-docker-compose -f docker-compose.local.yml up -d
-
-# Просмотр логов
-docker-compose -f docker-compose.local.yml logs -f
-
-# Остановка
-docker-compose -f docker-compose.local.yml down
+./deploy_alex_orator.sh
 ```
 
-### Production
-
+### Только backend API:
 ```bash
-# Запуск production окружения
-docker-compose up -d
-
-# С Nginx (production профиль)
-docker-compose --profile production up -d
+./deploy_alex_orator.sh --backend-only
 ```
 
-## ☸️ Kubernetes развертывание
-
-### 1. Создание namespace
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cloverdashbot
+### Только Telegram bot:
+```bash
+./deploy_alex_orator.sh --bot-only
 ```
 
-### 2. Создание ConfigMap
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloverdashbot-config
-  namespace: cloverdashbot
-data:
-  BACKEND_URL: "http://cloverdashbot-backend:8000"
-  LOG_LEVEL: "INFO"
+### Без баз данных (использовать внешние):
+```bash
+./deploy_alex_orator.sh --no-db
 ```
 
-### 3. Создание Secrets
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: cloverdashbot-secrets
-  namespace: cloverdashbot
-type: Opaque
-data:
-  OPENAI_API_KEY: <base64-encoded-key>
-  TELEGRAM_TOKEN: <base64-encoded-token>
-  JWT_SECRET_KEY: <base64-encoded-jwt-secret>
-  SECRET_KEY: <base64-encoded-secret>
-  APP_DB_PASSWORD: <base64-encoded-password>
-  DATA_DB_PASSWORD: <base64-encoded-password>
+### С кастомными параметрами:
+```bash
+./deploy_alex_orator.sh -h your-server.com -u ubuntu -k ~/.ssh/your-key
 ```
 
-### 4. Развертывание PostgreSQL
+## 📊 Архитектура развертывания
 
-```yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: cloverdashbot-app-db
-  namespace: cloverdashbot
-spec:
-  serviceName: cloverdashbot-app-db
-  replicas: 1
-  selector:
-    matchLabels:
-      app: cloverdashbot-app-db
-  template:
-    metadata:
-      labels:
-        app: cloverdashbot-app-db
-    spec:
-      containers:
-      - name: postgres
-        image: postgres:15-alpine
-        env:
-        - name: POSTGRES_DB
-          value: "app_db"
-        - name: POSTGRES_USER
-          value: "cloverdashbot"
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: cloverdashbot-secrets
-              key: APP_DB_PASSWORD
-        ports:
-        - containerPort: 5432
-        volumeMounts:
-        - name: app-db-storage
-          mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-  - metadata:
-      name: app-db-storage
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 10Gi
+Скрипт разворачивает следующие сервисы:
+
+### 🗄️ Базы данных (если включены):
+- **app-db**: PostgreSQL для приложения (порт 5432)
+- **data-db**: PostgreSQL для пользовательских данных (порт 5433)
+
+### 🔗 Backend API (если включен):
+- **backend**: FastAPI сервер (порт 8000)
+- Автоматические health checks
+- Swagger документация на `/docs`
+
+### 🤖 Telegram Bot (если включен):
+- **telegram-bot**: Telegram бот
+- Подключается к backend через внутреннюю сеть
+
+### 🌐 Дополнительно:
+- **nginx**: Reverse proxy (опционально, profile: production)
+- **alex-orator-network**: Docker сеть для всех сервисов
+
+## 🔧 Управление после деплоя
+
+### Проверка статуса:
+```bash
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose ps'
 ```
 
-### 5. Развертывание Backend
+### Просмотр логов:
+```bash
+# Все сервисы
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs -f'
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cloverdashbot-backend
-  namespace: cloverdashbot
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: cloverdashbot-backend
-  template:
-    metadata:
-      labels:
-        app: cloverdashbot-backend
-    spec:
-      containers:
-      - name: backend
-        image: cloverdashbot-backend:latest
-        ports:
-        - containerPort: 8000
-        env:
-        - name: DEBUG
-          value: "false"
-        - name: OPENAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: cloverdashbot-secrets
-              key: OPENAI_API_KEY
-        - name: APP_DATABASE_URL
-          value: "postgresql://cloverdashbot:$(APP_DB_PASSWORD)@cloverdashbot-app-db:5432/app_db"
-        - name: DATA_DATABASE_URL
-          value: "postgresql://cloverdashbot:$(DATA_DB_PASSWORD)@cloverdashbot-data-db:5432/data_db"
-        - name: JWT_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: cloverdashbot-secrets
-              key: JWT_SECRET_KEY
-        - name: SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: cloverdashbot-secrets
-              key: SECRET_KEY
-        livenessProbe:
-          httpGet:
-            path: /health/live
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health/ready
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+# Только backend
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs -f backend'
+
+# Только bot
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs -f telegram-bot'
 ```
 
-### 6. Развертывание Telegram Bot
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cloverdashbot-telegram
-  namespace: cloverdashbot
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: cloverdashbot-telegram
-  template:
-    metadata:
-      labels:
-        app: cloverdashbot-telegram
-    spec:
-      containers:
-      - name: telegram-bot
-        image: cloverdashbot-telegram:latest
-        env:
-        - name: TELEGRAM_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: cloverdashbot-secrets
-              key: TELEGRAM_TOKEN
-        - name: BACKEND_URL
-          valueFrom:
-            configMapKeyRef:
-              name: cloverdashbot-config
-              key: BACKEND_URL
-        - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: cloverdashbot-config
-              key: LOG_LEVEL
+### Перезапуск:
+```bash
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose restart'
 ```
 
-### 7. Создание Services
+### Остановка:
+```bash
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose down'
+```
 
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: cloverdashbot-backend
-  namespace: cloverdashbot
-spec:
-  selector:
-    app: cloverdashbot-backend
-  ports:
-  - port: 80
-    targetPort: 8000
-  type: ClusterIP
+### Обновление:
+```bash
+# Повторно запустите скрипт деплоя
+./deploy_alex_orator.sh
+```
+
+## 🔐 Требования к серверу
+
+### Минимальные системные требования:
+- **OS**: Ubuntu 20.04+ / CentOS 8+ / Debian 11+
+- **RAM**: 2GB минимум, 4GB рекомендуется
+- **Disk**: 10GB свободного места
+- **Network**: Открытые порты 8000 (API), 5432, 5433 (БД)
+
+### Автоматически устанавливается:
+- Docker
+- docker-compose
+- Все необходимые зависимости
+
+### SSH доступ:
+- Пользователь должен иметь права sudo
+- SSH ключ или пароль для подключения
+- Для не-root пользователей: добавление в группу docker
+
+## 📁 Структура файлов на сервере
+
+```
+/opt/alex-orator-bot/
+├── docker-compose.yml          # Конфигурация сервисов
+├── .env                        # Переменные окружения
+├── backend/                    # Backend API код
+├── telegram-bot/              # Telegram bot код
+├── deployment/                # SQL инициализация
+└── logs/                      # Логи приложений
+```
+
+## 🔍 Диагностика проблем
+
+### Backend не стартует:
+```bash
+# Проверить логи
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs backend'
+
+# Проверить health endpoint
+curl http://your-server:8000/health/
+```
+
+### Bot не отвечает:
+```bash
+# Проверить логи
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs telegram-bot'
+
+# Проверить токен в .env файле
+```
+
+### Проблемы с БД:
+```bash
+# Проверить статус контейнеров
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose ps'
+
+# Подключиться к БД
+ssh user@server 'docker exec -it alex-orator-bot-app-db psql -U alex_orator -d app_db'
+```
+
+## 🚨 Безопасность
+
+### Обязательно измените в production:
+- [ ] `SECRET_KEY` - новый уникальный ключ
+- [ ] `JWT_SECRET_KEY` - новый уникальный ключ  
+- [ ] `APP_DB_PASSWORD` - сильный пароль
+- [ ] `DATA_DB_PASSWORD` - сильный пароль
+- [ ] `TELEGRAM_TOKEN` - ваш реальный токен от @BotFather
+
+### Рекомендации:
+- Используйте SSH ключи вместо паролей
+- Настройте firewall на сервере
+- Регулярно обновляйте зависимости
+- Делайте бэкапы баз данных
+
+## 📞 Поддержка
+
+При проблемах с деплоем:
+
+1. **Проверьте логи** с помощью команд выше
+2. **Убедитесь в корректности** конфигурации в `deploy.env`
+3. **Проверьте доступность сервера** и SSH подключение
+4. **Убедитесь в наличии свободного места** на диске
+
+## 🎯 Готовые конфигурации
+
+### Для продакшена:
+```bash
+DEPLOY_BACKEND=true
+DEPLOY_BOT=true
+DEPLOY_DATABASES=true
+DEBUG=false
+LOG_LEVEL=INFO
+```
+
+### Для разработки/тестирования:
+```bash
+DEPLOY_BACKEND=true
+DEPLOY_BOT=false
+DEPLOY_DATABASES=true
+DEBUG=true
+LOG_LEVEL=DEBUG
+```
+
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: cloverdashbot-app-db
-  namespace: cloverdashbot
-spec:
-  selector:
-    app: cloverdashbot-app-db
-  ports:
-  - port: 5432
-    targetPort: 5432
-  type: ClusterIP
-```
 
-### 8. Ingress (опционально)
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: cloverdashbot-ingress
-  namespace: cloverdashbot
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-  - host: api.cloverdashbot.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: cloverdashbot-backend
-            port:
-              number: 80
-```
-
-## 🔧 Настройка базы данных
-
-### Инициализация схемы
-
-```sql
--- Создание пользователя с ограниченными правами для данных
-CREATE USER data_user WITH PASSWORD 'secure_password';
-GRANT CONNECT ON DATABASE data_db TO data_user;
-GRANT USAGE ON SCHEMA public TO data_user;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO data_user;
-GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO data_user;
-
--- Настройка прав на будущие таблицы
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO data_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO data_user;
-```
-
-### Импорт данных
-
-```bash
-# Импорт данных в data_db
-psql -h localhost -p 5433 -U cloverdashbot -d data_db -f your_data.sql
-
-# Или через Docker
-docker exec -i cloverdashbot-data-db psql -U cloverdashbot -d data_db < your_data.sql
-```
-
-## 📊 Мониторинг
-
-### Prometheus метрики
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus-config
-  namespace: monitoring
-data:
-  prometheus.yml: |
-    global:
-      scrape_interval: 15s
-    scrape_configs:
-    - job_name: 'cloverdashbot-backend'
-      static_configs:
-      - targets: ['cloverdashbot-backend:8000']
-      metrics_path: /metrics
-```
-
-### Grafana дашборд
-
-Создайте дашборд для мониторинга:
-- Количество запросов
-- Время ответа API
-- Ошибки
-- Использование ресурсов
-
-## 🔒 Безопасность
-
-### SSL/TLS сертификаты
-
-```bash
-# Генерация самоподписанного сертификата
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout deployment/ssl/nginx.key \
-  -out deployment/ssl/nginx.crt
-```
-
-### Firewall правила
-
-```bash
-# Ограничение доступа к базам данных
-iptables -A INPUT -p tcp --dport 5432 -s 10.0.0.0/8 -j ACCEPT
-iptables -A INPUT -p tcp --dport 5432 -j DROP
-
-iptables -A INPUT -p tcp --dport 5433 -s 10.0.0.0/8 -j ACCEPT
-iptables -A INPUT -p tcp --dport 5433 -j DROP
-```
-
-## 🚀 CI/CD
-
-### GitHub Actions
-
-```yaml
-name: Deploy to Production
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    
-    - name: Build and push Docker images
-      run: |
-        docker build -t cloverdashbot-backend ./backend
-        docker build -t cloverdashbot-telegram ./telegram-bot
-        # Push to registry
-    
-    - name: Deploy to Kubernetes
-      run: |
-        kubectl apply -f k8s/
-        kubectl rollout restart deployment/cloverdashbot-backend
-        kubectl rollout restart deployment/cloverdashbot-telegram
-```
-
-## 📝 Логирование
-
-### Централизованное логирование
-
-```yaml
-# Fluentd конфигурация
-<source>
-  @type tail
-  path /var/log/containers/cloverdashbot-*.log
-  pos_file /var/log/cloverdashbot.log.pos
-  tag cloverdashbot
-  read_from_head true
-  <parse>
-    @type json
-    time_key time
-    time_format %Y-%m-%dT%H:%M:%S.%NZ
-  </parse>
-</source>
-
-<match cloverdashbot>
-  @type elasticsearch
-  host elasticsearch
-  port 9200
-  index_name cloverdashbot
-</match>
-```
-
-## 🔄 Обновления
-
-### Rolling Update
-
-```bash
-# Обновление с нулевым временем простоя
-kubectl set image deployment/cloverdashbot-backend backend=cloverdashbot-backend:v2.0.0
-kubectl rollout status deployment/cloverdashbot-backend
-
-kubectl set image deployment/cloverdashbot-telegram telegram-bot=cloverdashbot-telegram:v2.0.0
-kubectl rollout status deployment/cloverdashbot-telegram
-```
-
-### Rollback
-
-```bash
-# Откат к предыдущей версии
-kubectl rollout undo deployment/cloverdashbot-backend
-kubectl rollout undo deployment/cloverdashbot-telegram
-``` 
+**Alex Orator Bot** готов к продакшену! 🎉

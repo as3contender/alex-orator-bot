@@ -1,0 +1,111 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs (keep structure but not log files)
+logs/*.log
+logs/*.txt
+*.log
+
+# Test files
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Development files
+*_test.py
+test_*.py
+tests/
+.deployignore
+deploy.env
+deploy.env.example
+
+# Documentation that's not needed in production
+*.md
+!README.md
+
+# Development scripts
+test_*.py
+*_test.py
+load_bot_content.py
+content_parser.py
+bot_content_data.py
+generate_keys.py
+test_formatting.py
+
+# Local environment files (use production .env instead)
+.env.local
+.env.development
+.env.test
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database files (use containerized DBs)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup

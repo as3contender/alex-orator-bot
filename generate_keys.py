@@ -134,7 +134,6 @@ API_RETRY_DELAY=1
 
 # Базы данных (для Docker контейнеров)
 APP_DATABASE_URL=postgresql://alex_orator:{db_password}@app-db:5432/app_db
-DATA_DATABASE_URL=postgresql://alex_orator:{db_password}@data-db:5432/data_db
 
 # Пароль для баз данных
 DB_PASSWORD={db_password}

@@ -11,7 +11,6 @@ class Settings(BaseSettings):
 
     # Базы данных
     app_database_url: str = "postgresql://user:pass@localhost:5432/app_db"
-    data_database_url: str = "postgresql://user:pass@localhost:5433/data_db"
 
     # JWT
     jwt_secret_key: str = "your-jwt-secret-key"

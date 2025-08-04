@@ -43,7 +43,6 @@ docker run -p 8000:8000 --env-file .env cloverdashbot-backend
 | `OPENAI_API_KEY` | API ключ OpenAI | - |
 | `OPENAI_MODEL` | Модель OpenAI | `gpt-3.5-turbo` |
 | `APP_DATABASE_URL` | URL базы данных приложения | - |
-| `DATA_DATABASE_URL` | URL базы данных пользовательских данных | - |
 | `JWT_SECRET_KEY` | Секретный ключ для JWT | - |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Время жизни токена (мин) | `30` |
 

@@ -73,7 +73,6 @@ make clean             # Очистка контейнеров
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
 APP_DATABASE_URL=postgresql://user:pass@localhost:5432/app_db
-DATA_DATABASE_URL=postgresql://user:pass@localhost:5433/data_db
 SECRET_KEY=your-secret-key-here
 ```
 

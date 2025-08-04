@@ -7,7 +7,6 @@ from loguru import logger
 from config.settings import settings
 from api.routes import router as api_router
 from services.app_database import app_database_service
-from services.data_database import data_database_service
 from services.orator_database import orator_db
 
 # Настройка логирования
@@ -47,7 +46,6 @@ async def startup_event():
     # Инициализация подключений к базам данных
     try:
         await app_database_service.connect()
-        await data_database_service.connect()
         await orator_db.connect()
         logger.info("Database connections established")
     except Exception as e:
@@ -62,7 +60,6 @@ async def shutdown_event():
     # Закрытие подключений к базам данных
     try:
         await app_database_service.disconnect()
-        await data_database_service.disconnect()
         await orator_db.disconnect()
         logger.info("Database connections closed")
     except Exception as e:
