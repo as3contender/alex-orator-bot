@@ -4,10 +4,10 @@ services:
   # PostgreSQL для приложения
   app-db:
     image: postgres:15-alpine
-    container_name: cloverdashbot-app-db
+    container_name: alex-orator-bot-app-db
     environment:
       POSTGRES_DB: app_db
-      POSTGRES_USER: cloverdashbot
+      POSTGRES_USER: alex_orator
       POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-secure_password}
     volumes:
       - app-db-data:/var/lib/postgresql/data
@@ -15,34 +15,18 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - cloverdashbot-network
+      - alex-orator-network
     restart: unless-stopped
 
-  # PostgreSQL для пользовательских данных
-  data-db:
-    image: postgres:15-alpine
-    container_name: cloverdashbot-data-db
-    environment:
-      POSTGRES_DB: data_db
-      POSTGRES_USER: cloverdashbot
-      POSTGRES_PASSWORD: ${DATA_DB_PASSWORD:-secure_password}
-    volumes:
-      - data-db-data:/var/lib/postgresql/data
-      - ./deployment/init-data-db.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5433:5432"
-    networks:
-      - cloverdashbot-network
-    restart: unless-stopped
 
   # Backend API
   backend:
     build: ./backend
-    container_name: cloverdashbot-backend
+    container_name: alex-orator-bot-backend
     environment:
       - DEBUG=false
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - APP_DATABASE_URL=postgresql://cloverdashbot:${APP_DB_PASSWORD:-secure_password}@app-db:5432/app_db
+      - APP_DATABASE_URL=postgresql://alex_orator:${APP_DB_PASSWORD:-secure_password}@app-db:5432/app_db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-jwt-secret-key-change-in-production}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
     ports:
@@ -51,7 +35,7 @@ services:
       - app-db
       - data-db
     networks:
-      - cloverdashbot-network
+      - alex-orator-network
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
@@ -59,7 +43,7 @@ services:
   # Telegram Bot
   telegram-bot:
     build: ./telegram-bot
-    container_name: cloverdashbot-telegram
+    container_name: alex-orator-bot-telegram
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - BACKEND_URL=http://backend:8000
@@ -67,7 +51,7 @@ services:
     depends_on:
       - backend
     networks:
-      - cloverdashbot-network
+      - alex-orator-network
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
@@ -75,7 +59,7 @@ services:
   # Nginx (опционально, для production)
   nginx:
     image: nginx:alpine
-    container_name: cloverdashbot-nginx
+    container_name: alex-orator-bot-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -85,7 +69,7 @@ services:
     depends_on:
       - backend
     networks:
-      - cloverdashbot-network
+      - alex-orator-network
     restart: unless-stopped
     profiles:
       - production
@@ -97,5 +81,5 @@ volumes:
     driver: local
 
 networks:
-  cloverdashbot-network:
+  alex-orator-network:
     driver: bridge 

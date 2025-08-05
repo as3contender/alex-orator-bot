@@ -183,13 +183,7 @@ class CommandHandler(OratorBaseHandler):
                 await update.message.reply_text(get_text("error_authentication", "ru"))
                 return
 
-            # Проверяем, может ли feedback_handler обработать это сообщение
-            if hasattr(self, "feedback_handler"):
-                feedback_handled = await self.feedback_handler.handle_text_message(update, context)
-                if feedback_handled:
-                    return  # Сообщение было обработано feedback_handler'ом
-
-            # Если сообщение не обработано, отвечаем стандартным сообщением с подсказкой о меню
+            # Обрабатываем текстовые сообщения как обычно
             await update.message.reply_text(
                 "Используйте команды бота для навигации:\n"
                 "• /menu - главное меню\n"

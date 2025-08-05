@@ -241,7 +241,6 @@ usage() {
     echo "  REMOTE_USER=ubuntu"
     echo "  SSH_KEY_PATH=~/.ssh/your-key"
     echo "  APP_DB_PASSWORD=secure_db_password"
-    echo "  DATA_DB_PASSWORD=secure_data_password"
     echo "  JWT_SECRET_KEY=your-jwt-secret"
     echo "  SECRET_KEY=your-secret-key"
     echo "  TELEGRAM_TOKEN=your_bot_token"
@@ -385,10 +384,18 @@ echo ""
 
 # Copy project files (excluding development files)
 echo -e "${BLUE}📁 Copying project files...${NC}"
-$RSYNC_CMD -av --exclude-from=../.deployignore ../ $REMOTE_USER@$REMOTE_HOST:$REMOTE_DEPLOY_DIR/ 2>/dev/null || {
+
+# Check if .deployignore exists locally first
+if [ -f "../.deployignore" ]; then
+    echo -e "${YELLOW}📋 Using .deployignore exclusions...${NC}"
+    if ! $RSYNC_CMD -av --exclude-from=../.deployignore ../ $REMOTE_USER@$REMOTE_HOST:$REMOTE_DEPLOY_DIR/; then
+        echo -e "${YELLOW}⚠️  rsync with .deployignore failed, using basic exclusions${NC}"
+        $RSYNC_CMD -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='node_modules' --exclude='.pytest_cache' --exclude='venv' --exclude='logs/*' ../ $REMOTE_USER@$REMOTE_HOST:$REMOTE_DEPLOY_DIR/
+    fi
+else
     echo -e "${YELLOW}⚠️  .deployignore not found, using basic exclusions${NC}"
     $RSYNC_CMD -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='node_modules' --exclude='.pytest_cache' --exclude='venv' --exclude='logs/*' ../ $REMOTE_USER@$REMOTE_HOST:$REMOTE_DEPLOY_DIR/
-}
+fi
 echo -e "${GREEN}✅ Files copied${NC}"
 
 # Configure for production
@@ -397,8 +404,8 @@ $SSH_CMD $REMOTE_USER@$REMOTE_HOST "
     cd $REMOTE_DEPLOY_DIR
     
     # Update container names in docker-compose.yml
-    sed -i 's/cloverdashbot/alex-orator-bot/g' docker-compose.yml 2>/dev/null || true
-    sed -i 's/cloverdashbot-network/alex-orator-network/g' docker-compose.yml 2>/dev/null || true
+    sed -i 's/alex-orator-bot/alex-orator-bot/g' docker-compose.yml 2>/dev/null || true
+    sed -i 's/alex-orator-network/alex-orator-network/g' docker-compose.yml 2>/dev/null || true
     
     # Set production environment
     sed -i 's/DEBUG=.*/DEBUG=false/' .env 2>/dev/null || true

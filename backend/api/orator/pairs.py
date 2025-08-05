@@ -1,3 +1,4 @@
+from models.orator.message_queue import MessageQueue
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from typing import List
@@ -28,6 +29,19 @@ async def create_pair(
             user1_id=current_user_id, user2_id=candidate_id, registration_id=registration["id"]
         )
 
+        # Добавляем сообщение в очередь
+        user_profile = await orator_db.get_user_profile(current_user_id)
+        candidate_profile = await orator_db.get_user_profile(candidate_id)
+        if user_profile["last_name"] == "":
+            last_name = ""
+        else:
+            last_name = f" {user_profile['last_name']}"
+        message_queue = MessageQueue(
+            user_id=candidate_profile["telegram_id"],
+            message=f"Вы были добавлены в пару с кандидатом {user_profile['first_name']}{last_name}",
+        )
+        await orator_db.add_message(message_queue)
+
         if not user_pair:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create pair")
 
@@ -46,6 +60,24 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         user_pair = await orator_db.confirm_user_pair(pair_id, True)
         if not user_pair:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found")
+
+        # Добавляем сообщение в очередь
+        user_profile = await orator_db.get_user_profile(current_user_id)
+        if user_pair["user2_id"] == current_user_id:
+            candidate_id = user_pair["user1_id"]
+        else:
+            candidate_id = user_pair["user2_id"]
+        candidate_profile = await orator_db.get_user_profile(candidate_id)
+        if candidate_profile["last_name"] == "":
+            last_name = ""
+        else:
+            last_name = f" {candidate_profile['last_name']}"
+
+        message_queue = MessageQueue(
+            user_id=candidate_profile["telegram_id"],
+            message=f"Пара с {user_profile['first_name']}{last_name} подтверждена. Начинайте тренировку!",
+        )
+        await orator_db.add_message(message_queue)
 
         return UserPairResponse.from_user_pair(user_pair)
     except HTTPException:
@@ -78,6 +110,23 @@ async def cancel_pair(pair_id: str, current_user_id: str = Depends(security_serv
         user_pair = await orator_db.cancel_user_pair(pair_id, current_user_id)
         if not user_pair:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found")
+
+        # Добавляем сообщение в очередь
+        user_profile = await orator_db.get_user_profile(current_user_id)
+        if user_pair["user2_id"] == current_user_id:
+            candidate_id = user_pair["user1_id"]
+        else:
+            candidate_id = user_pair["user2_id"]
+        candidate_profile = await orator_db.get_user_profile(candidate_id)
+        if candidate_profile["last_name"] == "":
+            last_name = ""
+        else:
+            last_name = f" {candidate_profile['last_name']}"
+        message_queue = MessageQueue(
+            user_id=candidate_profile["telegram_id"],
+            message=f"Пара с {user_profile['first_name']}{last_name} отменена. Попробуйте найти другую пару.",
+        )
+        await orator_db.add_message(message_queue)
 
         return UserPairResponse.from_user_pair(user_pair)
     except HTTPException:

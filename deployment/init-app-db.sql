@@ -1,4 +1,4 @@
--- Инициализация базы данных приложения CloverdashBot
+-- Инициализация базы данных приложения Alex Orator Bot
 -- Этот скрипт выполняется автоматически при первом запуске PostgreSQL контейнера
 
 -- Включение расширения для UUID
@@ -85,7 +85,7 @@ CREATE TRIGGER update_database_descriptions_updated_at BEFORE UPDATE ON database
 -- Создание пользователя по умолчанию (опционально)
 -- INSERT INTO users (email, username, hashed_password, first_name, is_superuser)
 -- VALUES (
---     'admin@cloverdashbot.com',
+--     'admin@alex-orator-bot.com',
 --     'admin',
 --     '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4tbQJxqKre', -- password: admin123
 --     'Administrator',
@@ -99,5 +99,5 @@ CREATE TRIGGER update_database_descriptions_updated_at BEFORE UPDATE ON database
 -- Логирование успешной инициализации
 DO $$
 BEGIN
-    RAISE NOTICE 'CloverdashBot application database initialized successfully';
+    RAISE NOTICE 'Alex Orator Bot application database initialized successfully';
 END $$; 

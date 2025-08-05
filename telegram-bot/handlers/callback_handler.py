@@ -100,11 +100,17 @@ class CallbackHandler(OratorBaseHandler):
             elif callback_data.startswith("candidate_"):
                 await self.pairs_handler.handle_candidate_selection(query, callback_data, language)
 
-            # Обратная связь (теперь только через пары)
-            elif callback_data.startswith("feedback_"):
-                await self.feedback_handler.handle_feedback_type_callback(query, callback_data, language)
+            # Обратная связь
             elif callback_data.startswith("pair_feedback_"):
                 await self.feedback_handler.handle_pair_feedback(query, callback_data, language)
+            elif callback_data.startswith("r"):
+                logger.info(f"CallbackHandler: processing rating callback: {callback_data}")
+                await self.feedback_handler.handle_rating_callback(query, callback_data, language)
+            elif callback_data == "cancel_feedback":
+                logger.info(f"CallbackHandler: processing cancel feedback callback")
+                await self.feedback_handler.handle_cancel_feedback(query, language)
+            elif callback_data.startswith("feedback_"):
+                await self.feedback_handler.handle_feedback_type_callback(query, callback_data, language)
 
             # Остальные callback'ы
             elif callback_data == "find":
@@ -128,6 +134,9 @@ class CallbackHandler(OratorBaseHandler):
 
         except Exception as e:
             logger.error(f"Callback handler error: {e}")
+            import traceback
+
+            logger.error(f"Callback handler traceback: {traceback.format_exc()}")
             await query.edit_message_text(get_text("error_unknown", "ru"))
 
     # Простые обработчики, которые остались в главном файле

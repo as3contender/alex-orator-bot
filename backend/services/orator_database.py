@@ -1,5 +1,6 @@
 import asyncpg
 from typing import Optional, List, Dict, Any
+from models.orator.message_queue import MessageQueue
 from loguru import logger
 from datetime import datetime, date, timedelta
 from uuid import UUID
@@ -199,8 +200,22 @@ class OratorDatabaseService:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_pairs_status ON user_pairs(status)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_session_feedback_pair_id ON session_feedback(pair_id)")
 
+            # Таблица очереди сообщений
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS message_queue (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id VARCHAR(100) NOT NULL,
+                    message TEXT NOT NULL,
+                    sent BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    sent_at TIMESTAMP
+                )
+            """
+            )
+
             # Инициализация базового контента
-            await self._initialize_bot_content(conn)
+            # await self._initialize_bot_content(conn)
 
             # Инициализация настроек по умолчанию
             await self._initialize_default_settings(conn)
@@ -1111,6 +1126,20 @@ class OratorDatabaseService:
                 """
             )
             return [dict(row) for row in rows]
+
+    async def add_message(self, message: MessageQueue) -> bool:
+        """Добавить сообщение в очередь"""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                INSERT INTO message_queue (user_id, message, sent)
+                VALUES ($1, $2, $3)
+                """,
+                message.user_id,
+                message.message,
+                message.sent,
+            )
+            return result != "INSERT 0"
 
 
 # Создание экземпляра сервиса
