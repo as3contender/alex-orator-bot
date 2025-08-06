@@ -207,6 +207,7 @@ REMOTE_HOST="${REMOTE_HOST:-YOUR_SERVER_IP}"
 SSH_KEY="${SSH_KEY_PATH:-~/.ssh/your_ssh_key}"
 DEPLOY_BACKEND="${DEPLOY_BACKEND:-true}"
 DEPLOY_BOT="${DEPLOY_BOT:-true}"
+DEPLOY_WORKER="${DEPLOY_WORKER:-true}"
 DEPLOY_DATABASES="${DEPLOY_DATABASES:-true}"
 REMOTE_DEPLOY_DIR="${REMOTE_DEPLOY_DIR:-/opt/alex-orator-bot}"
 
@@ -226,6 +227,7 @@ usage() {
     echo "  -k, --key PATH      SSH private key path (default from deploy.env or '~/.ssh/your_ssh_key')"
     echo "  --backend-only      Deploy only backend API"
     echo "  --bot-only          Deploy only Telegram bot"
+    echo "  --worker-only       Deploy only message queue worker"
     echo "  --no-db            Skip database deployment"
     echo "  --help              Show this help message"
     echo ""
@@ -233,6 +235,7 @@ usage() {
     echo "  $0                               # Deploy using deploy.env configuration"
     echo "  $0 --backend-only                # Deploy only backend API"
     echo "  $0 --bot-only                    # Deploy only bot"
+    echo "  $0 --worker-only                 # Deploy only message queue worker"
     echo "  $0 --no-db                       # Deploy without databases"
     echo "  $0 -h your-server.com -u ubuntu # Override server and user"
     echo ""
@@ -270,7 +273,15 @@ while [[ $# -gt 0 ]]; do
         --bot-only)
             DEPLOY_BACKEND=false
             DEPLOY_BOT=true
+            DEPLOY_WORKER=false
             DEPLOY_DATABASES=false
+            shift
+            ;;
+        --worker-only)
+            DEPLOY_BACKEND=false
+            DEPLOY_BOT=false
+            DEPLOY_WORKER=true
+            DEPLOY_DATABASES=true
             shift
             ;;
         --no-db)
@@ -303,6 +314,7 @@ echo -e "${YELLOW}Deploy Dir: $REMOTE_DEPLOY_DIR${NC}"
 echo -e "${YELLOW}Databases: $([ "$DEPLOY_DATABASES" = true ] && echo "✅ Will deploy" || echo "⏭️  Skipped")${NC}"
 echo -e "${YELLOW}Backend API: $([ "$DEPLOY_BACKEND" = true ] && echo "✅ Will deploy" || echo "⏭️  Skipped")${NC}"
 echo -e "${YELLOW}Telegram Bot: $([ "$DEPLOY_BOT" = true ] && echo "✅ Will deploy" || echo "⏭️  Skipped")${NC}"
+echo -e "${YELLOW}Message Queue Worker: $([ "$DEPLOY_WORKER" = true ] && echo "✅ Will deploy" || echo "⏭️  Skipped")${NC}"
 echo ""
 
 # Prepare SSH command with aggressive keep-alive settings
@@ -442,15 +454,21 @@ $SSH_CMD $REMOTE_USER@$REMOTE_HOST "
     fi
     
     # Start services based on deployment flags
-    if [ '$DEPLOY_DATABASES' = true ] && [ '$DEPLOY_BACKEND' = true ] && [ '$DEPLOY_BOT' = true ]; then
+    if [ '$DEPLOY_DATABASES' = true ] && [ '$DEPLOY_BACKEND' = true ] && [ '$DEPLOY_BOT' = true ] && [ '$DEPLOY_WORKER' = true ]; then
         echo 'Starting all services...'
         docker-compose up -d
+    elif [ '$DEPLOY_DATABASES' = true ] && [ '$DEPLOY_BACKEND' = true ] && [ '$DEPLOY_WORKER' = true ]; then
+        echo 'Starting databases, backend and worker...'
+        docker-compose up -d app-db data-db backend worker
     elif [ '$DEPLOY_DATABASES' = true ] && [ '$DEPLOY_BACKEND' = true ]; then
         echo 'Starting databases and backend...'
         docker-compose up -d app-db data-db backend
     elif [ '$DEPLOY_BOT' = true ]; then
         echo 'Starting bot only...'
         docker-compose up -d telegram-bot
+    elif [ '$DEPLOY_WORKER' = true ]; then
+        echo 'Starting worker only...'
+        docker-compose up -d app-db worker
     fi
     
     # Wait for services to be ready
@@ -490,6 +508,18 @@ if [ "$DEPLOY_BOT" = true ]; then
     fi
 fi
 
+if [ "$DEPLOY_WORKER" = true ]; then
+    echo -e "${YELLOW}Checking Message Queue Worker...${NC}"
+    if $SSH_CMD $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DEPLOY_DIR && docker-compose ps worker | grep -q 'Up'"; then
+        echo -e "${GREEN}✅ Message Queue Worker is running!${NC}"
+    else
+        echo -e "${RED}❌ Message Queue Worker is not running${NC}"
+        echo -e "${YELLOW}Checking worker logs:${NC}"
+        $SSH_CMD $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DEPLOY_DIR && docker-compose logs --tail=20 worker"
+        exit 1
+    fi
+fi
+
 # Final summary
 echo ""
 echo -e "${GREEN}🎉 Alex Orator Bot deployment completed successfully!${NC}"
@@ -515,6 +545,12 @@ if [ "$DEPLOY_BOT" = true ]; then
     echo -e "   • Test: Send /start to your bot in Telegram"
 fi
 
+if [ "$DEPLOY_WORKER" = true ]; then
+    echo -e "${YELLOW}⚙️  Message Queue Worker:${NC}"
+    echo -e "   • Status: Running and processing message queue"
+    echo -e "   • Processing: Messages from backend to Telegram users"
+fi
+
 echo ""
 echo -e "${BLUE}📊 Useful commands:${NC}"
 echo -e "${YELLOW}# Check all services status:${NC}"
@@ -522,7 +558,7 @@ echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compos
 
 echo ""
 echo -e "${YELLOW}# View logs:${NC}"
-if [ "$DEPLOY_BACKEND" = true ] && [ "$DEPLOY_BOT" = true ]; then
+if [ "$DEPLOY_BACKEND" = true ] && [ "$DEPLOY_BOT" = true ] && [ "$DEPLOY_WORKER" = true ]; then
     echo "# All services logs:"
     echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f'"
     echo ""
@@ -531,10 +567,18 @@ if [ "$DEPLOY_BACKEND" = true ] && [ "$DEPLOY_BOT" = true ]; then
     echo ""
     echo "# Bot logs only:"
     echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f telegram-bot'"
+    echo ""
+    echo "# Worker logs only:"
+    echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f worker'"
+elif [ "$DEPLOY_BACKEND" = true ] && [ "$DEPLOY_WORKER" = true ]; then
+    echo "# Backend and Worker logs:"
+    echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f backend worker'"
 elif [ "$DEPLOY_BACKEND" = true ]; then
     echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f backend'"
 elif [ "$DEPLOY_BOT" = true ]; then
     echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f telegram-bot'"
+elif [ "$DEPLOY_WORKER" = true ]; then
+    echo "$SSH_CMD $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DEPLOY_DIR && docker-compose logs -f worker'"
 fi
 
 echo ""

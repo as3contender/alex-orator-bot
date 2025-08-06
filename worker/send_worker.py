@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN environment variable is required")
 bot = Bot(token=BOT_TOKEN)
 
 CHECK_INTERVAL = 5  # секунд
