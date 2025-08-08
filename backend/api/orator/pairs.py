@@ -63,10 +63,7 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
 
         # Добавляем сообщение в очередь
         user_profile = await orator_db.get_user_profile(current_user_id)
-        if user_pair["user2_id"] == current_user_id:
-            candidate_id = user_pair["user1_id"]
-        else:
-            candidate_id = user_pair["user2_id"]
+        candidate_id = user_pair["user2_id"]
         candidate_profile = await orator_db.get_user_profile(candidate_id)
         if candidate_profile["last_name"] == "":
             last_name = ""
