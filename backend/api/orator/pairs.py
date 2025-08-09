@@ -32,13 +32,13 @@ async def create_pair(
         # Добавляем сообщение в очередь
         user_profile = await orator_db.get_user_profile(current_user_id)
         candidate_profile = await orator_db.get_user_profile(candidate_id)
-        if user_profile["last_name"] == "":
-            last_name = ""
+        if user_profile["username"] == "":
+            username = ""
         else:
-            last_name = f" {user_profile['last_name']}"
+            username = f" {user_profile['username']}"
         message_queue = MessageQueue(
             user_id=candidate_profile["telegram_id"],
-            message=f"Вы были добавлены в пару с кандидатом {user_profile['first_name']}{last_name}",
+            message=f"Вы были добавлены в пару с кандидатом {user_profile['first_name']} @{username}",
         )
         await orator_db.add_message(message_queue)
 
@@ -65,14 +65,14 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         user_profile = await orator_db.get_user_profile(current_user_id)
         candidate_id = user_pair["user2_id"]
         candidate_profile = await orator_db.get_user_profile(candidate_id)
-        if candidate_profile["last_name"] == "":
-            last_name = ""
+        if candidate_profile["username"] == "":
+            username = ""
         else:
-            last_name = f" {candidate_profile['last_name']}"
+            username = f" {candidate_profile['username']}"
 
         message_queue = MessageQueue(
             user_id=candidate_profile["telegram_id"],
-            message=f"Пара с {user_profile['first_name']}{last_name} подтверждена. Начинайте тренировку!",
+            message=f"Пара с {user_profile['first_name']} @{username} подтверждена. Начинайте тренировку!",
         )
         await orator_db.add_message(message_queue)
 
@@ -115,13 +115,13 @@ async def cancel_pair(pair_id: str, current_user_id: str = Depends(security_serv
         else:
             candidate_id = user_pair["user2_id"]
         candidate_profile = await orator_db.get_user_profile(candidate_id)
-        if candidate_profile["last_name"] == "":
-            last_name = ""
+        if candidate_profile["username"] == "":
+            username = ""
         else:
-            last_name = f" {candidate_profile['last_name']}"
+            username = f" {candidate_profile['username']}"
         message_queue = MessageQueue(
             user_id=candidate_profile["telegram_id"],
-            message=f"Пара с {user_profile['first_name']}{last_name} отменена. Попробуйте найти другую пару.",
+            message=f"Пара с {user_profile['first_name']} @{username} отменена. Попробуйте найти другую пару.",
         )
         await orator_db.add_message(message_queue)
 
