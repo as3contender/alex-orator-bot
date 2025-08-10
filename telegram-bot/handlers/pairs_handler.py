@@ -74,7 +74,10 @@ class PairsHandler(OratorBaseHandler):
         partner_name = target_pair.get("partner_name", "Пользователь")
         status = target_pair.get("status", "unknown")
         is_initiator = target_pair.get("is_initiator", False)
-        username = target_pair.get("partner_username", "Пользователь")
+        if status == "confirmed":
+            username = f"@{target_pair.get('partner_username', 'Пользователь')}"
+        else:
+            username = ""
 
         # Формируем текст с информацией о паре
         status_emoji = "✅" if status == "confirmed" else "⏳" if status == "pending" else "❌"
@@ -82,7 +85,7 @@ class PairsHandler(OratorBaseHandler):
             "Подтверждена" if status == "confirmed" else "Ожидает подтверждения" if status == "pending" else "Отменена"
         )
 
-        pair_info = f"👥 Пара с {partner_name} @{username}\n"
+        pair_info = f"👥 Пара с {partner_name} {username}\n"
         pair_info += f"📊 Статус: {status_emoji} {status_text}\n"
         pair_info += f"🎯 Роль: {'Инициатор' if is_initiator else 'Участник'}\n"
 

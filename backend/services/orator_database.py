@@ -989,6 +989,7 @@ class OratorDatabaseService:
                 JOIN users u2 ON up.user2_id = u2.id
                 WHERE (up.user1_id = $1 OR up.user2_id = $1) 
                 AND wr.week_start_date = $2
+                AND up.status != 'cancelled'
                 ORDER BY up.created_at DESC
                 """,
                 user_id,
