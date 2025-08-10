@@ -94,13 +94,13 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         # Добавить сообщение с ником и кнопкой написать в телеграм
         start_dialog_message = "Привет.%20Я%20от%20%40AlexOratorBot"
 
-        if user_profile["username"] is None or user_profile["username"] == "":
+        if partner_profile["username"] is None or partner_profile["username"] == "":
             keyboard = {
                 "inline_keyboard": [
                     [
                         {
                             "text": "✉️ Написать в Telegram",
-                            "url": f"tg://user?id={user_profile['telegram_id']}&text={start_dialog_message}",
+                            "url": f"tg://user?id={partner_profile['telegram_id']}&text={start_dialog_message}",
                         },
                     ]
                 ]
@@ -111,7 +111,7 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
                     [
                         {
                             "text": "✉️ Написать в Telegram",
-                            "url": f"https://t.me/{user_profile['username']}?text={start_dialog_message}",
+                            "url": f"https://t.me/{partner_profile['username']}?text={start_dialog_message}",
                         },
                     ]
                 ]
