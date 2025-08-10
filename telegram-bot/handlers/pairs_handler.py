@@ -10,6 +10,8 @@ from orator_translations import get_text, get_button_text
 
 from telegram.constants import ParseMode
 
+from urllib.parse import quote
+
 
 def escape_html(text: str) -> str:
     """Экранирует HTML символы"""
@@ -116,7 +118,8 @@ class PairsHandler(OratorBaseHandler):
             keyboard.append([InlineKeyboardButton("❌ Отменить", callback_data=f"pair_cancel_{pair_id}")])
 
         # Обратная связь доступна только для подтвержденных пар
-        start_dialog_message = "Привет.%20Я%20от%20%40AlexOratorBot"
+        message_text = "Привет! Я от @AlexOratorBot"
+        start_dialog_message = quote(message_text)
 
         if status == "confirmed":
             if status == "confirmed" and username:

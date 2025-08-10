@@ -6,6 +6,7 @@ from typing import List
 from models.orator import UserPairResponse
 from services.security import security_service
 from services.orator_database import orator_db
+from urllib.parse import quote
 
 router = APIRouter()
 
@@ -92,7 +93,9 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         await orator_db.add_message(message_queue)
 
         # Добавить сообщение с ником и кнопкой написать в телеграм
-        start_dialog_message = "Привет.%20Я%20от%20%40AlexOratorBot"
+
+        message_text = "Привет! Я от @AlexOratorBot"
+        start_dialog_message = quote(message_text)
 
         if partner_profile["username"] is None or partner_profile["username"] == "":
             keyboard = {
