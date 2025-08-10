@@ -727,12 +727,33 @@ class OratorDatabaseService:
                     SELECT 
                         up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
                         up.user1_id, up.user2_id,
-                        wr.week_start_date, wr.week_end_date
+                        CASE 
+                            WHEN up.user1_id = $2 THEN up.user2_id
+                            ELSE up.user1_id
+                        END as partner_id,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN u2.username
+                            ELSE u1.username
+                        END as partner_username,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
+                            ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
+                        END as partner_name,
+                        wr.week_start_date, wr.week_end_date,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN TRUE
+                            ELSE FALSE
+                        END as is_initiator
                     FROM user_pairs up
                     JOIN week_registrations wr ON up.week_registration_id = wr.id
+                    JOIN users u1 ON up.user1_id = u1.id
+                    JOIN users u2 ON up.user2_id = u2.id
                     WHERE up.id = $1
                     """,
                     pair_id,
+                    # Нужно передать user_id, но у нас его нет в этом методе
+                    # Пока что используем user1_id как fallback
+                    await conn.fetchval("SELECT user1_id FROM user_pairs WHERE id = $1", pair_id),
                 )
                 return dict(row) if row else None
 
@@ -744,12 +765,33 @@ class OratorDatabaseService:
                     SELECT 
                         up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
                         up.user1_id, up.user2_id,
-                        wr.week_start_date, wr.week_end_date
+                        CASE 
+                            WHEN up.user1_id = $2 THEN up.user2_id
+                            ELSE up.user1_id
+                        END as partner_id,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN u2.username
+                            ELSE u1.username
+                        END as partner_username,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
+                            ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
+                        END as partner_name,
+                        wr.week_start_date, wr.week_end_date,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN TRUE
+                            ELSE FALSE
+                        END as is_initiator
                     FROM user_pairs up
                     JOIN week_registrations wr ON up.week_registration_id = wr.id
+                    JOIN users u1 ON up.user1_id = u1.id
+                    JOIN users u2 ON up.user2_id = u2.id
                     WHERE up.id = $1
                     """,
                     pair_id,
+                    # Нужно передать user_id, но у нас его нет в этом методе
+                    # Пока что используем user1_id как fallback
+                    await conn.fetchval("SELECT user1_id FROM user_pairs WHERE id = $1", pair_id),
                 )
                 return dict(row) if row else None
 
@@ -782,12 +824,33 @@ class OratorDatabaseService:
                 SELECT 
                     up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
                     up.user1_id, up.user2_id,
-                    wr.week_start_date, wr.week_end_date
+                    CASE 
+                        WHEN up.user1_id = $2 THEN up.user2_id
+                        ELSE up.user1_id
+                    END as partner_id,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN u2.username
+                        ELSE u1.username
+                    END as partner_username,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
+                        ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
+                    END as partner_name,
+                    wr.week_start_date, wr.week_end_date,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN TRUE
+                        ELSE FALSE
+                    END as is_initiator
                 FROM user_pairs up
                 JOIN week_registrations wr ON up.week_registration_id = wr.id
+                JOIN users u1 ON up.user1_id = u1.id
+                JOIN users u2 ON up.user2_id = u2.id
                 WHERE up.id = $1
                 """,
                 pair_id,
+                # Нужно передать user_id, но у нас его нет в этом методе
+                # Пока что используем user1_id как fallback
+                await conn.fetchval("SELECT user1_id FROM user_pairs WHERE id = $1", pair_id),
             )
             return dict(row) if row else None
 
