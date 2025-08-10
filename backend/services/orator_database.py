@@ -673,31 +673,23 @@ class OratorDatabaseService:
                 SELECT 
                     up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
                     up.user1_id, up.user2_id,
-                    CASE 
-                        WHEN up.user1_id = $1 THEN up.user2_id
-                        ELSE up.user1_id
-                    END as partner_id,
-                    CASE 
-                        WHEN up.user1_id = $1 THEN u2.username
-                        ELSE u1.username
-                    END as partner_username,
-                    CASE 
-                        WHEN up.user1_id = $1 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
-                        ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
-                    END as partner_name,
-                    wr.week_start_date, wr.week_end_date
+                    up.user2_id as partner_id,
+                    COALESCE(u2.username, '') as partner_username,
+                    u2.telegram_id as partner_telegram_id,
+                    u2.first_name || ' ' || COALESCE(u2.last_name, '') as partner_name,
+                    wr.week_start_date, wr.week_end_date,
+                    TRUE as is_initiator
                 FROM user_pairs up
                 JOIN week_registrations wr ON up.week_registration_id = wr.id
                 JOIN users u1 ON up.user1_id = u1.id
                 JOIN users u2 ON up.user2_id = u2.id
-                WHERE up.id = $2
+                WHERE up.id = $1
                 """,
-                user1_id,
                 pair_id,
             )
             return dict(row) if row else None
 
-    async def confirm_user_pair(self, pair_id: UUID, confirmed: bool) -> Optional[Dict[str, Any]]:
+    async def confirm_user_pair(self, pair_id: UUID, confirmed: bool, user_id: UUID = None) -> Optional[Dict[str, Any]]:
         """Подтвердить или отклонить пару"""
         async with self.pool.acquire() as conn:
             # Сначала проверяем, существует ли пара
@@ -736,6 +728,10 @@ class OratorDatabaseService:
                             ELSE u1.username
                         END as partner_username,
                         CASE 
+                            WHEN up.user1_id = $2 THEN u2.telegram_id
+                            ELSE u1.telegram_id
+                        END as partner_telegram_id,
+                        CASE 
                             WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                             ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
                         END as partner_name,
@@ -751,9 +747,7 @@ class OratorDatabaseService:
                     WHERE up.id = $1
                     """,
                     pair_id,
-                    # Нужно передать user_id, но у нас его нет в этом методе
-                    # Пока что используем user1_id как fallback
-                    await conn.fetchval("SELECT user1_id FROM user_pairs WHERE id = $1", pair_id),
+                    user_id,
                 )
                 return dict(row) if row else None
 
@@ -774,6 +768,10 @@ class OratorDatabaseService:
                             ELSE u1.username
                         END as partner_username,
                         CASE 
+                            WHEN up.user1_id = $2 THEN u2.telegram_id
+                            ELSE u1.telegram_id
+                        END as partner_telegram_id,
+                        CASE 
                             WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                             ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
                         END as partner_name,
@@ -789,9 +787,7 @@ class OratorDatabaseService:
                     WHERE up.id = $1
                     """,
                     pair_id,
-                    # Нужно передать user_id, но у нас его нет в этом методе
-                    # Пока что используем user1_id как fallback
-                    await conn.fetchval("SELECT user1_id FROM user_pairs WHERE id = $1", pair_id),
+                    user_id,
                 )
                 return dict(row) if row else None
 
@@ -833,6 +829,10 @@ class OratorDatabaseService:
                         ELSE u1.username
                     END as partner_username,
                     CASE 
+                        WHEN up.user1_id = $2 THEN u2.telegram_id
+                        ELSE u1.telegram_id
+                    END as partner_telegram_id,
+                    CASE 
                         WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                         ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
                     END as partner_name,
@@ -848,9 +848,7 @@ class OratorDatabaseService:
                 WHERE up.id = $1
                 """,
                 pair_id,
-                # Нужно передать user_id, но у нас его нет в этом методе
-                # Пока что используем user1_id как fallback
-                await conn.fetchval("SELECT user1_id FROM user_pairs WHERE id = $1", pair_id),
+                user_id,
             )
             return dict(row) if row else None
 
@@ -971,9 +969,13 @@ class OratorDatabaseService:
                         ELSE up.user1_id
                     END as partner_id,
                     CASE 
-                        WHEN up.user1_id = $1 THEN u2.username
-                        ELSE u1.username
+                        WHEN up.user1_id = $1 THEN COALESCE(u2.username, '')
+                        ELSE COALESCE(u1.username, '')
                     END as partner_username,
+                    CASE 
+                        WHEN up.user1_id = $1 THEN COALESCE(u2.telegram_id, '')
+                        ELSE COALESCE(u1.telegram_id, '')
+                    END as partner_telegram_id,
                     CASE 
                         WHEN up.user1_id = $1 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                         ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')

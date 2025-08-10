@@ -39,6 +39,29 @@ class OratorAPIClient:
             logger.error(f"Backend connection check failed: {e}")
             raise BackendConnectionError(f"Failed to connect to backend: {e}")
 
+    async def _make_request_without_retry(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Выполнить HTTP запрос без retry логики"""
+        url = f"{self.base_url}{endpoint}"
+        headers = kwargs.get("headers", {})
+        if self.auth_token:
+            headers["Authorization"] = f"Bearer {self.auth_token}"
+        kwargs["headers"] = headers
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.request(method, url, **kwargs) as response:
+                    if response.status == 401:
+                        raise AuthenticationError("Authentication required")
+                    elif response.status >= 400:
+                        error_text = await response.text()
+                        logger.error(f"API request failed: {response.status} - {error_text}")
+                        raise BackendConnectionError(f"API request failed: {response.status}")
+
+                    return await response.json()
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP request failed: {e}")
+            raise BackendConnectionError(f"HTTP request failed: {e}")
+
     @retry(
         stop=stop_after_attempt(API_RETRY_ATTEMPTS), wait=wait_exponential(multiplier=1, min=API_RETRY_DELAY, max=10)
     )
@@ -144,7 +167,10 @@ class OratorAPIClient:
 
     async def create_pair(self, candidate_id: str) -> Dict[str, Any]:
         """Создать пару с кандидатом"""
-        return await self._make_request("POST", "/api/v1/orator/pairs/create", json={"candidate_id": candidate_id})
+        # Отключаем retry для создания пары, чтобы избежать дублирования
+        return await self._make_request_without_retry(
+            "POST", "/api/v1/orator/pairs/create", json={"candidate_id": candidate_id}
+        )
 
     async def confirm_pair(self, pair_id: str) -> Dict[str, Any]:
         """Подтвердить пару"""

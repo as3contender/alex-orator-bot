@@ -34,7 +34,9 @@ class CommandHandler(OratorBaseHandler):
             if self.content_manager and self.content_manager.is_content_loaded():
                 # Приветственное сообщение (уже отформатировано)
                 welcome_text = self.content_manager.get_content("welcome_message", language)
-                logger.info(f"Welcome text (first 100 chars): {welcome_text[:100]}")
+                welcome_text += (
+                    "\n\n Поделиться обратной связью по работе бота можно в группе https://t.me/+QD8-o4q4pX1mODVi"
+                )
 
                 # Сообщение о тренировке (уже отформатировано)
                 training_text = self.content_manager.get_content(
@@ -54,8 +56,18 @@ class CommandHandler(OratorBaseHandler):
             await update.message.reply_text(welcome_text)
 
             # Отправляем сообщение о тренировке с кнопками
-            reply_markup = self._create_main_menu_keyboard(language)
-            await update.message.reply_text(training_text, reply_markup=reply_markup)
+            from telegram import ReplyKeyboardMarkup, KeyboardButton
+
+            menu_keyboard = ReplyKeyboardMarkup(
+                [
+                    [KeyboardButton("🚀 Зарегистрироваться"), KeyboardButton("👥 Мои пары")],
+                    [KeyboardButton("🔍 Поиск кандидатов"), KeyboardButton("🗒 Мои задачи")],
+                    [KeyboardButton("🔄 Перезапуск бота"), KeyboardButton("❓ Помощь")],
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=False,
+            )
+            await update.message.reply_text(training_text, reply_markup=menu_keyboard)
 
             logger.info(f"User {user.id} started Alex Orator Bot")
 
@@ -104,8 +116,19 @@ class CommandHandler(OratorBaseHandler):
                 # Fallback к статическому тексту
                 training_text = get_text("хочешь_тренироваться_на_этой_неделе_второе_сообщение", language)
 
-            # Используем общую логику отображения меню
-            await self._show_main_menu_common(language, update.message.reply_text, message_text=training_text)
+            # Отправляем сообщение с клавиатурой меню
+            from telegram import ReplyKeyboardMarkup, KeyboardButton
+
+            menu_keyboard = ReplyKeyboardMarkup(
+                [
+                    [KeyboardButton("🚀 Зарегистрироваться"), KeyboardButton("👥 Мои пары")],
+                    [KeyboardButton("🔍 Поиск кандидатов"), KeyboardButton("🗒 Мои задачи")],
+                    [KeyboardButton("🔄 Перезапуск бота"), KeyboardButton("❓ Помощь")],
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=False,
+            )
+            await update.message.reply_text(training_text, reply_markup=menu_keyboard)
 
             logger.info(f"User {user.id} opened menu via /menu command")
 

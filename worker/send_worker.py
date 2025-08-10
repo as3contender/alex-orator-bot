@@ -83,9 +83,11 @@ async def send_one(bot: Bot, pool, row, sem: asyncio.Semaphore):
                     keyboard_buttons.append(button_row)
 
                 reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-                await bot.send_message(chat_id=row["user_id"], text=row["message"], reply_markup=reply_markup)
+                await bot.send_message(
+                    chat_id=row["user_id"], text=row["message"], reply_markup=reply_markup, parse_mode="HTML"
+                )
             else:
-                await bot.send_message(chat_id=row["user_id"], text=row["message"])
+                await bot.send_message(chat_id=row["user_id"], text=row["message"], parse_mode="HTML")
             async with pool.acquire() as conn:
                 await mark_sent(conn, row["id"])  # фиксируем доставку
             print(f"✅ sent id={row['id']} user={row['user_id']}")

@@ -56,10 +56,9 @@ class AlexOratorBot:
     def _build_menu_keyboard(self) -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             [
-                [KeyboardButton("👥 Мои пары")],
-                [KeyboardButton("🗒 Мои задачи")],
-                [KeyboardButton("🚀 Зарегистрироваться")],
-                [KeyboardButton("❓ Помощь")],
+                [KeyboardButton("🚀 Зарегистрироваться"), KeyboardButton("👥 Мои пары")],
+                [KeyboardButton("🔍 Поиск кандидатов"), KeyboardButton("🗒 Мои задачи")],
+                [KeyboardButton("🔄 Перезапуск бота"), KeyboardButton("❓ Помощь")],
             ],
             resize_keyboard=True,
             one_time_keyboard=False,
@@ -79,6 +78,56 @@ class AlexOratorBot:
         self.application.add_handler(
             MessageHandler(filters.TEXT & filters.Regex(r"^❓ Помощь$"), self._handle_help_message)
         )
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & filters.Regex(r"^🔍 Поиск кандидатов$"), self._handle_find_candidates_message)
+        )
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & filters.Regex(r"^🔄 Перезапуск бота$"), self._handle_restart_bot_message)
+        )
+
+    async def _handle_find_candidates_message(self, update, context):
+        """Обработчик текстового сообщения для поиска кандидатов"""
+        try:
+            # Аутентификация пользователя
+            if not await self.command_handler._authenticate_user(update):
+                await update.message.reply_text("Ошибка аутентификации")
+                return
+
+            language = await self.command_handler._get_user_language(update)
+
+            # Используем find_candidates_handler для обработки
+            # Создаем mock query для совместимости с callback handler
+            from telegram import CallbackQuery
+
+            mock_query = type(
+                "MockQuery",
+                (),
+                {
+                    "edit_message_text": update.message.reply_text,
+                    "message": update.message,
+                    "from_user": update.effective_user,
+                },
+            )()
+            await self.callback_handler._handle_find_callback(mock_query, language)
+
+        except Exception as e:
+            logger.error(f"Find candidates message handler error: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке запроса")
+
+    async def _handle_restart_bot_message(self, update, context):
+        """Обработчик текстового сообщения для перезапуска бота"""
+        try:
+            # Аутентификация пользователя
+            if not await self.command_handler._authenticate_user(update):
+                await update.message.reply_text("Ошибка аутентификации")
+                return
+
+            # Используем restart_bot_handler для обработки
+            await self.command_handler.start_command(update, context)
+
+        except Exception as e:
+            logger.error(f"Restart bot message handler error: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке запроса")
 
     async def _handle_pairs_message(self, update, context):
         """Обработчик текстового сообщения для пар"""

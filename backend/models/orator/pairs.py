@@ -23,6 +23,7 @@ class UserPairResponse(BaseModel):
     id: str
     partner_id: str
     partner_username: str
+    partner_telegram_id: str
     partner_name: str
     week_start_date: date
     week_end_date: date
@@ -40,6 +41,7 @@ class UserPairResponse(BaseModel):
             id=str(user_pair["id"]),
             partner_id=str(user_pair["partner_id"]),
             partner_username=user_pair["partner_username"],
+            partner_telegram_id=user_pair["partner_telegram_id"],
             partner_name=user_pair["partner_name"],
             week_start_date=user_pair["week_start_date"],
             week_end_date=user_pair["week_end_date"],

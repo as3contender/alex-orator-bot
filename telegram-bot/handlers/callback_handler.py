@@ -36,6 +36,11 @@ class CallbackHandler(OratorBaseHandler):
         await query.answer()
 
         try:
+            # Аутентификация пользователя
+            if not await self._authenticate_user_from_query(query):
+                await query.edit_message_text("Ошибка аутентификации. Попробуйте команду /start")
+                return
+
             callback_data = query.data
             logger.info(f"CALLBACK: Received callback: {callback_data}")
             language = await self._get_user_language(update)

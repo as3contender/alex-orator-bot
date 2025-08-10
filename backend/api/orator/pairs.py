@@ -10,6 +10,11 @@ from services.orator_database import orator_db
 router = APIRouter()
 
 
+def escape_html(text: str) -> str:
+    """Экранирует HTML символы"""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 @router.post("/create", response_model=UserPairResponse)
 async def create_pair(
     pair_data: dict, current_user_id: str = Depends(security_service.get_current_user_id)  # {"candidate_id": "uuid"}
@@ -65,7 +70,7 @@ async def create_pair(
 async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_service.get_current_user_id)):
     """Подтвердить пару"""
     try:
-        user_pair = await orator_db.confirm_user_pair(pair_id, True)
+        user_pair = await orator_db.confirm_user_pair(pair_id, True, current_user_id)
         if not user_pair:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found")
 
@@ -73,28 +78,53 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         user_profile = await orator_db.get_user_profile(current_user_id)
         partner_profile = await orator_db.get_user_profile(user_pair["partner_id"])
 
+        if user_profile["username"] is None or user_profile["username"] == "":
+            user_link = (
+                f'<a href="tg://user?id={user_profile["telegram_id"]}">{escape_html(user_profile["first_name"])}</a>'
+            )
+        else:
+            user_link = f"@{user_profile['username']}"
+
         message_queue = MessageQueue(
             user_id=partner_profile["telegram_id"],
-            message=f"Пара с {user_profile['first_name']} @{user_profile['username']} подтверждена. Начинайте тренировку!",
+            message=f"Пара с {user_profile['first_name']} {user_link} подтверждена. Начинайте тренировку!",
         )
         await orator_db.add_message(message_queue)
 
         # Добавить сообщение с ником и кнопкой написать в телеграм
         start_dialog_message = "Привет.%20Я%20от%20%40AlexOratorBot"
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "✉️ Написать в Telegram",
-                        "url": f"https://t.me/{partner_profile['username']}?text={start_dialog_message}",
-                    },
+
+        if user_profile["username"] is None or user_profile["username"] == "":
+            keyboard = {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "✉️ Написать в Telegram",
+                            "url": f"tg://user?id={user_profile['telegram_id']}&text={start_dialog_message}",
+                        },
+                    ]
                 ]
-            ]
-        }
+            }
+        else:
+            keyboard = {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "✉️ Написать в Telegram",
+                            "url": f"https://t.me/{user_profile['username']}?text={start_dialog_message}",
+                        },
+                    ]
+                ]
+            }
+
+        if partner_profile["username"] is None or partner_profile["username"] == "":
+            user_link = f'<a href="tg://user?id={partner_profile["partner_telegram_id"]}">{escape_html(partner_profile["partner_name"])}</a>'
+        else:
+            user_link = f"@{partner_profile['username']}"
 
         message_queue = MessageQueue(
             user_id=user_profile["telegram_id"],
-            message=f"Вы подтвердили пару с {partner_profile['first_name']} @{partner_profile['username']}. Начинайте тренировку!",
+            message=f"Вы подтвердили пару с {partner_profile['first_name']} {user_link}. Начинайте тренировку!",
             keyboard=keyboard,
         )
         await orator_db.add_message(message_queue)

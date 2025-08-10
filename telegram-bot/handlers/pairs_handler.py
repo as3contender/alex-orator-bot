@@ -8,6 +8,13 @@ from loguru import logger
 from .base_handler import OratorBaseHandler
 from orator_translations import get_text, get_button_text
 
+from telegram.constants import ParseMode
+
+
+def escape_html(text: str) -> str:
+    """Экранирует HTML символы"""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
 
 class PairsHandler(OratorBaseHandler):
     """Обработчик управления парами"""
@@ -75,7 +82,7 @@ class PairsHandler(OratorBaseHandler):
         status = target_pair.get("status", "unknown")
         is_initiator = target_pair.get("is_initiator", False)
         if status == "confirmed":
-            username = target_pair.get("partner_username", "Пользователь")
+            username = target_pair.get("partner_username", "")
         else:
             username = ""
 
@@ -87,7 +94,14 @@ class PairsHandler(OratorBaseHandler):
 
         pair_info = f"👥 Пара с {partner_name} \n"
         if status == "confirmed":
-            pair_info += f"👤 Ник для связи: @{username}\n"
+            if username == "":
+                # user_link = f"[{partner_name}](tg://user?id={target_pair['partner_telegram_id']})"
+                user_link = (
+                    f'<a href="tg://user?id={target_pair["partner_telegram_id"]}">{escape_html(partner_name)}</a>'
+                )
+            else:
+                user_link = f"@{username}"
+            pair_info += f"👤 Ник для связи: {user_link}\n"
         pair_info += f"📊 Статус: {status_emoji} {status_text}\n"
         pair_info += f"🎯 Роль: {'Инициатор' if is_initiator else 'Участник'}\n"
 
@@ -107,23 +121,30 @@ class PairsHandler(OratorBaseHandler):
         if status == "confirmed":
             if status == "confirmed" and username:
                 # Кнопка для открытия диалога с пользователем (username)
-                keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            "✉️ Написать в Telegram", url=f"https://t.me/{username}?text={start_dialog_message}"
-                        )
-                    ]
-                )
+                if username == "":
+                    keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                "✉️ Написать в Telegram",
+                                url=f"tg://user?id={target_pair['partner_telegram_id']}&text={start_dialog_message}",
+                            )
+                        ]
+                    )
+                else:
+                    keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                "✉️ Написать в Telegram", url=f"https://t.me/{username}?text={start_dialog_message}"
+                            )
+                        ]
+                    )
             keyboard.append([InlineKeyboardButton("💬 Обратная связь", callback_data=f"pair_feedback_{pair_id}")])
 
         # Кнопка назад
         keyboard.append([InlineKeyboardButton("⬅️ Назад к парам", callback_data="pairs")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            pair_info,
-            reply_markup=reply_markup,
-        )
+        await query.edit_message_text(pair_info, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
     async def _handle_pair_action_common(
         self, action_func, success_message: str, error_message: str, query, language: str
