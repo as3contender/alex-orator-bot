@@ -69,9 +69,16 @@ async def send_one(bot: Bot, pool, row, sem: asyncio.Semaphore):
                 for row_buttons in keyboard_dict.get("inline_keyboard", []):
                     button_row = []
                     for button_data in row_buttons:
-                        button = InlineKeyboardButton(
-                            text=button_data["text"], callback_data=button_data["callback_data"]
-                        )
+                        # Поддерживаем как callback_data, так и url
+                        if "callback_data" in button_data:
+                            button = InlineKeyboardButton(
+                                text=button_data["text"], callback_data=button_data["callback_data"]
+                            )
+                        elif "url" in button_data:
+                            button = InlineKeyboardButton(text=button_data["text"], url=button_data["url"])
+                        else:
+                            # Пропускаем кнопки без callback_data или url
+                            continue
                         button_row.append(button)
                     keyboard_buttons.append(button_row)
 

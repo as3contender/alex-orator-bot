@@ -69,13 +69,33 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         if not user_pair:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found")
 
-        # Добавляем сообщение в очередь
+        # Добавляем сообщение о подтверждении партнеру в очередь
         user_profile = await orator_db.get_user_profile(current_user_id)
         partner_profile = await orator_db.get_user_profile(user_pair["partner_id"])
 
         message_queue = MessageQueue(
             user_id=partner_profile["telegram_id"],
             message=f"Пара с {user_profile['first_name']} @{user_profile['username']} подтверждена. Начинайте тренировку!",
+        )
+        await orator_db.add_message(message_queue)
+
+        # Добавить сообщение с ником и кнопкой написать в телеграм
+        start_dialog_message = "Привет.%20Я%20от%20%40AlexOratorBot"
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "✉️ Написать в Telegram",
+                        "url": f"https://t.me/{partner_profile['username']}?text={start_dialog_message}",
+                    },
+                ]
+            ]
+        }
+
+        message_queue = MessageQueue(
+            user_id=user_profile["telegram_id"],
+            message=f"Вы подтвердили пару с {partner_profile['first_name']} @{partner_profile['username']}. Начинайте тренировку!",
+            keyboard=keyboard,
         )
         await orator_db.add_message(message_queue)
 
