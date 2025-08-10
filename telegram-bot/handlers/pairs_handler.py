@@ -102,7 +102,18 @@ class PairsHandler(OratorBaseHandler):
             keyboard.append([InlineKeyboardButton("❌ Отменить", callback_data=f"pair_cancel_{pair_id}")])
 
         # Обратная связь доступна только для подтвержденных пар
+        start_dialog_message = "Привет.%20Я%20от%20%40AlexOratorBot"
+
         if status == "confirmed":
+            if status == "confirmed" and username:
+                # Кнопка для открытия диалога с пользователем (username)
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            "✉️ Написать в Telegram", url=f"https://t.me/{username}?text={start_dialog_message}"
+                        )
+                    ]
+                )
             keyboard.append([InlineKeyboardButton("💬 Обратная связь", callback_data=f"pair_feedback_{pair_id}")])
 
         # Кнопка назад
