@@ -29,16 +29,28 @@ async def create_pair(
             user1_id=current_user_id, user2_id=candidate_id, registration_id=registration["id"]
         )
 
-        # Добавляем сообщение в очередь
+        # Добавляем сообщение в очередь с кнопками
         user_profile = await orator_db.get_user_profile(current_user_id)
         candidate_profile = await orator_db.get_user_profile(candidate_id)
         if user_profile["username"] == "":
             username = ""
         else:
             username = f" {user_profile['username']}"
+
+        # Создаем клавиатуру с кнопками подтверждения/отмены
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "✅ Подтвердить", "callback_data": f"pair_confirm_{user_pair['id']}"},
+                    {"text": "❌ Отменить", "callback_data": f"pair_cancel_{user_pair['id']}"},
+                ]
+            ]
+        }
+
         message_queue = MessageQueue(
             user_id=candidate_profile["telegram_id"],
             message=f"Вы были добавлены в пару с кандидатом {user_profile['first_name']} @{username}",
+            keyboard=keyboard,
         )
         await orator_db.add_message(message_queue)
 
@@ -106,24 +118,28 @@ async def cancel_pair(pair_id: str, current_user_id: str = Depends(security_serv
     try:
         user_pair = await orator_db.cancel_user_pair(pair_id, current_user_id)
         if not user_pair:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Pair not found or you don't have permission to cancel it"
+            )
 
-        # Добавляем сообщение в очередь
-        user_profile = await orator_db.get_user_profile(current_user_id)
-        if user_pair["user2_id"] == current_user_id:
-            candidate_id = user_pair["user1_id"]
-        else:
-            candidate_id = user_pair["user2_id"]
-        candidate_profile = await orator_db.get_user_profile(candidate_id)
-        if candidate_profile["username"] == "":
-            username = ""
-        else:
-            username = f" {candidate_profile['username']}"
-        message_queue = MessageQueue(
-            user_id=candidate_profile["telegram_id"],
-            message=f"Пара с {user_profile['first_name']} @{username} отменена. Попробуйте найти другую пару.",
-        )
-        await orator_db.add_message(message_queue)
+        # Добавляем сообщение в очередь только если пара была действительно отменена (не была отменена ранее)
+        # Проверяем, что cancelled_at не NULL (пара была только что отменена)
+        if user_pair.get("cancelled_at") is not None:
+            user_profile = await orator_db.get_user_profile(current_user_id)
+            if user_pair["user2_id"] == current_user_id:
+                candidate_id = user_pair["user1_id"]
+            else:
+                candidate_id = user_pair["user2_id"]
+            candidate_profile = await orator_db.get_user_profile(candidate_id)
+            if candidate_profile["username"] == "":
+                username = ""
+            else:
+                username = f" {candidate_profile['username']}"
+            message_queue = MessageQueue(
+                user_id=candidate_profile["telegram_id"],
+                message=f"Пара с {user_profile['first_name']} @{username} отменена. Попробуйте найти другую пару.",
+            )
+            await orator_db.add_message(message_queue)
 
         return UserPairResponse.from_user_pair(user_pair)
     except HTTPException:

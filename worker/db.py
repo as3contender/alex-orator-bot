@@ -20,9 +20,8 @@ _db_pool: asyncpg.Pool | None = None
 
 
 def build_database_url() -> str:
-   
     """Собирает URL для подключения к базе данных из отдельных параметров"""
-    
+
     host = os.getenv("APP_DATABASE_HOST", "localhost")
     port = os.getenv("APP_DATABASE_PORT", "5434")
     user = os.getenv("APP_DATABASE_LOGIN", "alex_orator")

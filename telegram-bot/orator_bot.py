@@ -10,6 +10,8 @@ from error_handler import ErrorHandler
 from orator_api_client import OratorAPIClient
 from bot_content_manager import BotContentManager
 
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+
 # Настройка логирования
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
@@ -35,6 +37,10 @@ class AlexOratorBot:
         self.application.add_handler(CommandHandler("menu", self.command_handler.menu_command))
         self.application.add_handler(CommandHandler("mytasks", self.command_handler.mytasks_command))
 
+        # Обработка меню
+        self.menu_keyboard = self._build_menu_keyboard()
+        self._setup_menu_handler()
+
         # Обработка callback запросов (кнопки)
         self.application.add_handler(CallbackQueryHandler(self.callback_handler.handle_callback))
 
@@ -46,6 +52,114 @@ class AlexOratorBot:
     def _setup_error_handler(self):
         """Настройка обработчика ошибок"""
         self.application.add_error_handler(self.error_handler.handle_error)
+
+    def _build_menu_keyboard(self) -> ReplyKeyboardMarkup:
+        return ReplyKeyboardMarkup(
+            [
+                [KeyboardButton("👥 Мои пары")],
+                [KeyboardButton("🗒 Мои задачи")],
+                [KeyboardButton("🚀 Зарегистрироваться")],
+                [KeyboardButton("❓ Помощь")],
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=False,
+        )
+
+    def _setup_menu_handler(self):
+        """Настройка обработчика меню"""
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & filters.Regex(r"^👥 Мои пары$"), self._handle_pairs_message)
+        )
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & filters.Regex(r"^🗒 Мои задачи$"), self._handle_mytasks_message)
+        )
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & filters.Regex(r"^🚀 Зарегистрироваться$"), self._handle_register_message)
+        )
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & filters.Regex(r"^❓ Помощь$"), self._handle_help_message)
+        )
+
+    async def _handle_pairs_message(self, update, context):
+        """Обработчик текстового сообщения для пар"""
+        try:
+            # Аутентификация пользователя
+            if not await self.command_handler._authenticate_user(update):
+                await update.message.reply_text("Ошибка аутентификации")
+                return
+
+            language = await self.command_handler._get_user_language(update)
+
+            # Используем pairs_handler для обработки
+            await self.callback_handler.pairs_handler.handle_pairs_message(update, language)
+
+        except Exception as e:
+            logger.error(f"Pairs message handler error: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке запроса")
+
+    async def _handle_mytasks_message(self, update, context):
+        """Обработчик текстового сообщения для заданий"""
+        try:
+            # Аутентификация пользователя
+            if not await self.command_handler._authenticate_user(update):
+                await update.message.reply_text("Ошибка аутентификации")
+                return
+
+            language = await self.command_handler._get_user_language(update)
+
+            # Используем общую логику из command_handler
+            await self.command_handler._handle_mytasks_common(language, update.message.reply_text)
+
+        except Exception as e:
+            logger.error(f"MyTasks message handler error: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке запроса")
+
+    async def _handle_register_message(self, update, context):
+        """Обработчик текстового сообщения для регистрации"""
+        try:
+            # Аутентификация пользователя
+            if not await self.command_handler._authenticate_user(update):
+                await update.message.reply_text("Ошибка аутентификации")
+                return
+
+            language = await self.command_handler._get_user_language(update)
+
+            # Создаем mock query для совместимости с callback handler
+            from telegram import CallbackQuery
+
+            mock_query = type(
+                "MockQuery",
+                (),
+                {
+                    "edit_message_text": update.message.reply_text,
+                    "message": update.message,
+                    "from_user": update.effective_user,
+                },
+            )()
+
+            # Используем registration_handler для обработки
+            await self.callback_handler.registration_handler.handle_register_callback(mock_query, language)
+
+        except Exception as e:
+            logger.error(f"Register message handler error: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке запроса")
+
+    async def _handle_help_message(self, update, context):
+        """Обработчик текстового сообщения для помощи"""
+        try:
+            # Аутентификация пользователя
+            if not await self.command_handler._authenticate_user(update):
+                await update.message.reply_text("Ошибка аутентификации")
+                return
+
+            language = await self.command_handler._get_user_language(update)
+
+            # Используем command_handler для обработки
+            await self.command_handler.help_command(update, context)
+
+        except Exception as e:
+            logger.error(f"Help message handler error: {e}")
+            await update.message.reply_text("Произошла ошибка при обработке запроса")
 
     async def start(self):
         """Запуск бота"""

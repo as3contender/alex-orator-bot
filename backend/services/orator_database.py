@@ -207,6 +207,7 @@ class OratorDatabaseService:
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     user_id VARCHAR(100) NOT NULL,
                     message TEXT NOT NULL,
+                    keyboard JSONB,
                     sent BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     sent_at TIMESTAMP
@@ -671,10 +672,15 @@ class OratorDatabaseService:
                 """
                 SELECT 
                     up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                    up.user1_id, up.user2_id,
                     CASE 
                         WHEN up.user1_id = $1 THEN up.user2_id
                         ELSE up.user1_id
                     END as partner_id,
+                    CASE 
+                        WHEN up.user1_id = $1 THEN u2.username
+                        ELSE u1.username
+                    END as partner_username,
                     CASE 
                         WHEN up.user1_id = $1 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                         ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
@@ -694,6 +700,60 @@ class OratorDatabaseService:
     async def confirm_user_pair(self, pair_id: UUID, confirmed: bool) -> Optional[Dict[str, Any]]:
         """Подтвердить или отклонить пару"""
         async with self.pool.acquire() as conn:
+            # Сначала проверяем, существует ли пара
+            pair_exists = await conn.fetchval(
+                """
+                SELECT id FROM user_pairs WHERE id = $1
+                """,
+                pair_id,
+            )
+
+            if not pair_exists:
+                return None
+
+            # Проверяем текущий статус пары
+            current_status = await conn.fetchval(
+                """
+                SELECT status FROM user_pairs WHERE id = $1
+                """,
+                pair_id,
+            )
+
+            # Если пара уже подтверждена и мы пытаемся подтвердить её снова
+            if confirmed and current_status == "confirmed":
+                # Возвращаем информацию о паре без обновления
+                row = await conn.fetchrow(
+                    """
+                    SELECT 
+                        up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                        up.user1_id, up.user2_id,
+                        wr.week_start_date, wr.week_end_date
+                    FROM user_pairs up
+                    JOIN week_registrations wr ON up.week_registration_id = wr.id
+                    WHERE up.id = $1
+                    """,
+                    pair_id,
+                )
+                return dict(row) if row else None
+
+            # Если пара уже отменена и мы пытаемся отменить её снова
+            if not confirmed and current_status == "cancelled":
+                # Возвращаем информацию о паре без обновления
+                row = await conn.fetchrow(
+                    """
+                    SELECT 
+                        up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                        up.user1_id, up.user2_id,
+                        wr.week_start_date, wr.week_end_date
+                    FROM user_pairs up
+                    JOIN week_registrations wr ON up.week_registration_id = wr.id
+                    WHERE up.id = $1
+                    """,
+                    pair_id,
+                )
+                return dict(row) if row else None
+
+            # Обновляем статус только если пара в статусе pending
             if confirmed:
                 result = await conn.execute(
                     """
@@ -719,7 +779,13 @@ class OratorDatabaseService:
             # Возвращаем обновленную пару
             row = await conn.fetchrow(
                 """
-                SELECT * FROM user_pairs WHERE id = $1
+                SELECT 
+                    up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                    up.user1_id, up.user2_id,
+                    wr.week_start_date, wr.week_end_date
+                FROM user_pairs up
+                JOIN week_registrations wr ON up.week_registration_id = wr.id
+                WHERE up.id = $1
                 """,
                 pair_id,
             )
@@ -728,6 +794,62 @@ class OratorDatabaseService:
     async def cancel_user_pair(self, pair_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
         """Отменить пару"""
         async with self.pool.acquire() as conn:
+            # Сначала проверяем, существует ли пара
+            pair_exists = await conn.fetchval(
+                """
+                SELECT id FROM user_pairs WHERE id = $1
+                """,
+                pair_id,
+            )
+
+            if not pair_exists:
+                return None
+
+            # Проверяем текущий статус пары
+            current_status = await conn.fetchval(
+                """
+                SELECT status FROM user_pairs WHERE id = $1
+                """,
+                pair_id,
+            )
+
+            # Если пара уже отменена, возвращаем её информацию
+            if current_status == "cancelled":
+                # Возвращаем информацию о паре без обновления
+                row = await conn.fetchrow(
+                    """
+                    SELECT 
+                        up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                        up.user1_id, up.user2_id,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN up.user2_id
+                            ELSE up.user1_id
+                        END as partner_id,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN u2.username
+                            ELSE u1.username
+                        END as partner_username,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
+                            ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
+                        END as partner_name,
+                        wr.week_start_date, wr.week_end_date,
+                        CASE 
+                            WHEN up.user1_id = $2 THEN TRUE
+                            ELSE FALSE
+                        END as is_initiator
+                    FROM user_pairs up
+                    JOIN week_registrations wr ON up.week_registration_id = wr.id
+                    JOIN users u1 ON up.user1_id = u1.id
+                    JOIN users u2 ON up.user2_id = u2.id
+                    WHERE up.id = $1
+                    """,
+                    pair_id,
+                    user_id,
+                )
+                return dict(row) if row else None
+
+            # Обновляем статус только если пара не отменена
             result = await conn.execute(
                 """
                 UPDATE user_pairs 
@@ -745,10 +867,15 @@ class OratorDatabaseService:
                 """
                 SELECT 
                     up.id, up.status, up.created_at, up.confirmed_at, up.cancelled_at,
+                    up.user1_id, up.user2_id,
                     CASE 
                         WHEN up.user1_id = $2 THEN up.user2_id
                         ELSE up.user1_id
                     END as partner_id,
+                    CASE 
+                        WHEN up.user1_id = $2 THEN u2.username
+                        ELSE u1.username
+                    END as partner_username,
                     CASE 
                         WHEN up.user1_id = $2 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                         ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
@@ -780,6 +907,10 @@ class OratorDatabaseService:
                         WHEN up.user1_id = $1 THEN up.user2_id
                         ELSE up.user1_id
                     END as partner_id,
+                    CASE 
+                        WHEN up.user1_id = $1 THEN u2.username
+                        ELSE u1.username
+                    END as partner_username,
                     CASE 
                         WHEN up.user1_id = $1 THEN u2.first_name || ' ' || COALESCE(u2.last_name, '')
                         ELSE u1.first_name || ' ' || COALESCE(u1.last_name, '')
@@ -956,15 +1087,7 @@ class OratorDatabaseService:
                 ORDER BY content_key
                 """
 
-            logger.info(
-                f"get_exercises_by_topic: executing SQL query with topic_id='{topic_id}', language='{language}'"
-            )
-            logger.info(f"get_exercises_by_topic: SQL query: {sql_query}")
-
             rows = await conn.fetch(sql_query, topic_id, language)
-
-            logger.info(f"get_exercises_by_topic: query returned {len(rows)} rows")
-            logger.info(f"get_exercises_by_topic: {rows}")
 
             exercises = []
             for row in rows:
@@ -982,7 +1105,6 @@ class OratorDatabaseService:
                     }
                 )
 
-            logger.info(f"get_exercises_by_topic: returning {len(exercises)} exercises")
             return exercises
 
     async def update_bot_content(self, content_key: str, content_text: str, language: str = "ru") -> bool:
@@ -1129,14 +1251,20 @@ class OratorDatabaseService:
 
     async def add_message(self, message: MessageQueue) -> bool:
         """Добавить сообщение в очередь"""
+        import json
+
         async with self.pool.acquire() as conn:
+            # Сериализуем клавиатуру в JSON строку
+            keyboard_json = json.dumps(message.keyboard) if message.keyboard else None
+
             result = await conn.execute(
                 """
-                INSERT INTO message_queue (user_id, message, sent)
-                VALUES ($1, $2, $3)
+                INSERT INTO message_queue (user_id, message, keyboard, sent)
+                VALUES ($1, $2, $3, $4)
                 """,
                 message.user_id,
                 message.message,
+                keyboard_json,
                 message.sent,
             )
             return result != "INSERT 0"

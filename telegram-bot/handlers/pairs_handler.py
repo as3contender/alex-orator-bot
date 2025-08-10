@@ -12,13 +12,13 @@ from orator_translations import get_text, get_button_text
 class PairsHandler(OratorBaseHandler):
     """Обработчик управления парами"""
 
-    async def handle_pairs_callback(self, query, language: str):
-        """Обработка просмотра пар"""
+    async def _handle_pairs_common(self, language: str, send_message_func, edit_message_func=None):
+        """Общая логика обработки пар для сообщений и callback"""
         # Получаем пары пользователя
         pairs = await self.api_client.get_user_pairs()
 
         if not pairs:
-            await query.edit_message_text(get_text("pairs_empty", language))
+            await send_message_func(get_text("pairs_empty", language))
             return
 
         # Формируем список пар как кнопки
@@ -36,13 +36,22 @@ class PairsHandler(OratorBaseHandler):
             # Каждая пара - это кнопка
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"pair_details_{pair_id}")])
 
-        keyboard.append([InlineKeyboardButton(get_button_text("back", language), callback_data="start")])
+        keyboard.append([self._create_back_button(language, "cancel")])
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(
-            pairs_text,
-            reply_markup=reply_markup,
-        )
+        # Отправляем сообщение
+        if edit_message_func:
+            await edit_message_func(pairs_text, reply_markup=reply_markup)
+        else:
+            await send_message_func(pairs_text, reply_markup=reply_markup)
+
+    async def handle_pairs_message(self, update, language: str):
+        """Обработка текстового сообщения для просмотра пар"""
+        await self._handle_pairs_common(language, update.message.reply_text)
+
+    async def handle_pairs_callback(self, query, language: str):
+        """Обработка callback для просмотра пар"""
+        await self._handle_pairs_common(language, query.edit_message_text)
 
     async def handle_pair_details(self, query, callback_data: str, language: str):
         """Обработка деталей пары"""
@@ -65,6 +74,7 @@ class PairsHandler(OratorBaseHandler):
         partner_name = target_pair.get("partner_name", "Пользователь")
         status = target_pair.get("status", "unknown")
         is_initiator = target_pair.get("is_initiator", False)
+        username = target_pair.get("partner_username", "Пользователь")
 
         # Формируем текст с информацией о паре
         status_emoji = "✅" if status == "confirmed" else "⏳" if status == "pending" else "❌"
@@ -72,7 +82,7 @@ class PairsHandler(OratorBaseHandler):
             "Подтверждена" if status == "confirmed" else "Ожидает подтверждения" if status == "pending" else "Отменена"
         )
 
-        pair_info = f"👥 Пара с {partner_name}\n"
+        pair_info = f"👥 Пара с {partner_name} @{username}\n"
         pair_info += f"📊 Статус: {status_emoji} {status_text}\n"
         pair_info += f"🎯 Роль: {'Инициатор' if is_initiator else 'Участник'}\n"
 
@@ -99,60 +109,53 @@ class PairsHandler(OratorBaseHandler):
             reply_markup=reply_markup,
         )
 
-    async def handle_pair_confirm(self, query, callback_data: str, language: str):
-        """Обработка подтверждения пары"""
-        pair_id = callback_data.replace("pair_confirm_", "")
-
+    async def _handle_pair_action_common(
+        self, action_func, success_message: str, error_message: str, query, language: str
+    ):
+        """Общая логика для действий с парами (подтверждение, отмена, создание)"""
         try:
-            # Подтверждаем пару
-            await self.api_client.confirm_pair(pair_id)
+            # Выполняем действие
+            await action_func()
 
             # Показываем сообщение об успехе, затем список всех пар
-            await query.edit_message_text("✅ Пара подтверждена! Загружаем ваши пары...")
+            await query.edit_message_text(f"✅ {success_message} Загружаем ваши пары...")
 
             # Переиспользуем логику показа пар
             await self.handle_pairs_callback(query, language)
 
         except Exception as e:
-            logger.error(f"Confirm pair error: {e}")
-            await query.edit_message_text(
-                "❌ Ошибка при подтверждении пары",
-            )
+            logger.error(f"Pair action error: {e}")
+            await query.edit_message_text(f"❌ {error_message}")
+
+    async def handle_pair_confirm(self, query, callback_data: str, language: str):
+        """Обработка подтверждения пары"""
+        pair_id = callback_data.replace("pair_confirm_", "")
+
+        async def confirm_action():
+            await self.api_client.confirm_pair(pair_id)
+
+        await self._handle_pair_action_common(
+            confirm_action, "Пара подтверждена!", "Ошибка при подтверждении пары", query, language
+        )
 
     async def handle_pair_cancel(self, query, callback_data: str, language: str):
         """Обработка отмены пары"""
         pair_id = callback_data.replace("pair_cancel_", "")
 
-        try:
-            # Отменяем пару через новый API
+        async def cancel_action():
             await self.api_client.cancel_pair(pair_id)
 
-            # Показываем сообщение об успехе, затем список всех пар
-            await query.edit_message_text("✅ Пара отменена! Загружаем ваши пары...")
-
-            # Переиспользуем логику показа пар
-            await self.handle_pairs_callback(query, language)
-
-        except Exception as e:
-            logger.error(f"Cancel pair error: {e}")
-            await query.edit_message_text(
-                "❌ Ошибка при отмене пары",
-            )
+        await self._handle_pair_action_common(
+            cancel_action, "Пара отменена!", "Ошибка при отмене пары", query, language
+        )
 
     async def handle_candidate_selection(self, query, callback_data: str, language: str):
         """Обработка выбора кандидата"""
         candidate_id = callback_data.replace("candidate_", "")
 
-        try:
-            # Создаем пару
+        async def create_action():
             await self.api_client.create_pair(candidate_id)
 
-            # Показываем сообщение об успехе, затем список всех пар
-            await query.edit_message_text("✅ Пара создана! Загружаем ваши пары...")
-
-            # Переиспользуем логику показа пар
-            await self.handle_pairs_callback(query, language)
-
-        except Exception as e:
-            logger.error(f"Create pair error: {e}")
-            await query.edit_message_text(get_text("pair_failed", language))
+        await self._handle_pair_action_common(
+            create_action, "Пара создана!", get_text("pair_failed", language), query, language
+        )

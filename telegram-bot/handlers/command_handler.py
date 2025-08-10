@@ -54,18 +54,7 @@ class CommandHandler(OratorBaseHandler):
             await update.message.reply_text(welcome_text)
 
             # Отправляем сообщение о тренировке с кнопками
-            keyboard = [
-                [
-                    InlineKeyboardButton(get_button_text("register", language), callback_data="register"),
-                    InlineKeyboardButton("📋 Задания", callback_data="mytasks"),
-                ],
-                [
-                    InlineKeyboardButton("🔍 Поиск кандидатов", callback_data="find"),
-                    InlineKeyboardButton("👥 Мои пары", callback_data="pairs"),
-                ],
-            ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = self._create_main_menu_keyboard(language)
             await update.message.reply_text(training_text, reply_markup=reply_markup)
 
             logger.info(f"User {user.id} started Alex Orator Bot")
@@ -115,20 +104,8 @@ class CommandHandler(OratorBaseHandler):
                 # Fallback к статическому тексту
                 training_text = get_text("хочешь_тренироваться_на_этой_неделе_второе_сообщение", language)
 
-            # Создаем интерактивные кнопки
-            keyboard = [
-                [
-                    InlineKeyboardButton(get_button_text("register", language), callback_data="register"),
-                    InlineKeyboardButton("📋 Задания", callback_data="mytasks"),
-                ],
-                [
-                    InlineKeyboardButton("🔍 Поиск кандидатов", callback_data="find"),
-                    InlineKeyboardButton("👥 Мои пары", callback_data="pairs"),
-                ],
-            ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(training_text, reply_markup=reply_markup)
+            # Используем общую логику отображения меню
+            await self._show_main_menu_common(language, update.message.reply_text, message_text=training_text)
 
             logger.info(f"User {user.id} opened menu via /menu command")
 
@@ -147,30 +124,7 @@ class CommandHandler(OratorBaseHandler):
             language = await self._get_user_language(update)
 
             # Используем общую логику из базового класса
-            tasks_data, error_message = await self._get_user_tasks(user.id, language)
-
-            if error_message:
-                await update.message.reply_text(error_message)
-                return
-
-            # Отправляем заголовок
-            await update.message.reply_text(tasks_data["header"])
-
-            # Отправляем каждое упражнение отдельным сообщением
-            for exercise in tasks_data["exercises"]:
-                exercise_text = exercise["content_text"]
-                formatted_text = f"{exercise_text}"
-
-                # Разбиваем длинные сообщения (Telegram лимит ~4096 символов)
-                if len(formatted_text) > 4000:
-                    # Отправляем по частям
-                    parts = [formatted_text[j : j + 4000] for j in range(0, len(formatted_text), 4000)]
-                    for part in parts:
-                        await update.message.reply_text(part)
-                else:
-                    await update.message.reply_text(formatted_text)
-
-            logger.info(f"User {user.id} requested mytasks, found {len(tasks_data['exercises'])} exercises")
+            await self._handle_mytasks_common(language, update.message.reply_text)
 
         except Exception as e:
             logger.error(f"MyTasks command error: {e}")

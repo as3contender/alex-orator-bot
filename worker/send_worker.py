@@ -7,6 +7,7 @@ import contextlib
 from datetime import datetime, timezone
 
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
 from db import get_db_pool, close_db_pool  # используем твои функции из db.py
@@ -32,7 +33,7 @@ async def fetch_batch(conn):
             FOR UPDATE SKIP LOCKED
             LIMIT $1
         )
-        SELECT mq.id, mq.user_id, mq.message
+        SELECT mq.id, mq.user_id, mq.message, mq.keyboard
         FROM message_queue mq
         JOIN cte ON mq.id = cte.id;
         """,
@@ -54,9 +55,30 @@ async def mark_sent(conn, msg_id):
 
 async def send_one(bot: Bot, pool, row, sem: asyncio.Semaphore):
     """Отправляем одно сообщение с ограничением по параллелизму."""
+    import json
+
     async with sem:
         try:
-            await bot.send_message(chat_id=row["user_id"], text=row["message"])  # Telegram
+            keyboard = row["keyboard"]
+            if keyboard:
+                # Десериализуем JSON строку обратно в словарь
+                keyboard_dict = json.loads(keyboard) if isinstance(keyboard, str) else keyboard
+
+                # Создаем клавиатуру правильно для aiogram
+                keyboard_buttons = []
+                for row_buttons in keyboard_dict.get("inline_keyboard", []):
+                    button_row = []
+                    for button_data in row_buttons:
+                        button = InlineKeyboardButton(
+                            text=button_data["text"], callback_data=button_data["callback_data"]
+                        )
+                        button_row.append(button)
+                    keyboard_buttons.append(button_row)
+
+                reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+                await bot.send_message(chat_id=row["user_id"], text=row["message"], reply_markup=reply_markup)
+            else:
+                await bot.send_message(chat_id=row["user_id"], text=row["message"])
             async with pool.acquire() as conn:
                 await mark_sent(conn, row["id"])  # фиксируем доставку
             print(f"✅ sent id={row['id']} user={row['user_id']}")

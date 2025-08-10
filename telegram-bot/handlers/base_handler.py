@@ -2,11 +2,12 @@
 Базовый класс для всех обработчиков
 """
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
 from loguru import logger
 
 from orator_api_client import OratorAPIClient
-from orator_translations import get_text
+from orator_translations import get_text, get_button_text
 from bot_content_manager import format_text_for_telegram
 
 
@@ -130,3 +131,134 @@ class OratorBaseHandler:
         except Exception as e:
             logger.error(f"Error getting user tasks: {e}")
             return None, "Произошла ошибка при получении заданий."
+
+    async def _get_user_pairs(self, user_id: int = None):
+        """Получение пар пользователя"""
+        try:
+            pairs = await self.api_client.get_user_pairs()
+            return pairs, None
+        except Exception as e:
+            logger.error(f"Error getting user pairs: {e}")
+            return None, "Произошла ошибка при получении пар."
+
+    async def _handle_mytasks_common(self, language: str, send_message_func, edit_message_func=None):
+        """Общая логика обработки mytasks для команды и callback"""
+        try:
+            # Проверяем, есть ли хотя бы одна подтвержденная пара
+            pairs_data, error_message = await self._get_user_pairs()
+            if error_message:
+                await send_message_func(error_message)
+                return
+
+            if len(pairs_data) == 0:
+                await send_message_func(get_text("no_confirmed_pairs", language))
+                return
+
+            # Проверяем, есть ли подтвержденная пара
+            has_confirmed_pairs = False
+            for pair in pairs_data:
+                if pair["status"] == "confirmed":
+                    has_confirmed_pairs = True
+                    break
+
+            if not has_confirmed_pairs:
+                await send_message_func(get_text("no_confirmed_pairs", language))
+                return
+
+            # Используем общую логику получения заданий
+            tasks_data, error_message = await self._get_user_tasks(language)
+
+            if error_message:
+                await send_message_func(error_message)
+                return
+
+            # Отправляем заголовок
+            if edit_message_func:
+                await edit_message_func(tasks_data["header"])
+            else:
+                await send_message_func(tasks_data["header"])
+
+            # Отправляем каждое упражнение отдельным сообщением
+            for exercise in tasks_data["exercises"]:
+                exercise_text = exercise["content_text"]
+                formatted_text = f"{exercise_text}"
+
+                # Разбиваем длинные сообщения (Telegram лимит ~4096 символов)
+                if len(formatted_text) > 4000:
+                    parts = [formatted_text[j : j + 4000] for j in range(0, len(formatted_text), 4000)]
+                    for part in parts:
+                        await send_message_func(part)
+                else:
+                    await send_message_func(formatted_text)
+
+            # Отправляем сообщение о том, что партнер может иметь другие задания
+            await send_message_func(get_text("partner_may_have_other_tasks", language))
+
+            logger.info(f"User requested mytasks, found {len(tasks_data['exercises'])} exercises")
+
+        except Exception as e:
+            logger.error(f"MyTasks common handler error: {e}")
+            await send_message_func(get_text("error_unknown", "ru"))
+
+    def _create_main_menu_keyboard(self, language: str) -> InlineKeyboardMarkup:
+        """Создает клавиатуру главного меню"""
+        keyboard = [
+            [
+                InlineKeyboardButton(get_button_text("register", language), callback_data="register"),
+                InlineKeyboardButton("📋 Задания", callback_data="mytasks"),
+            ],
+            [
+                InlineKeyboardButton("🔍 Поиск кандидатов", callback_data="find"),
+                InlineKeyboardButton("👥 Мои пары", callback_data="pairs"),
+            ],
+        ]
+
+        return InlineKeyboardMarkup(keyboard)
+
+    async def _show_main_menu_common(
+        self, language: str, send_message_func, edit_message_func=None, message_text: str = None
+    ):
+        """Общая логика отображения главного меню"""
+        from orator_translations import get_text
+
+        if message_text is None:
+            message_text = (
+                get_text("main_menu_welcome", language)
+                if hasattr(get_text, "main_menu_welcome")
+                else "Выберите действие:"
+            )
+
+        reply_markup = self._create_main_menu_keyboard(language)
+
+        if edit_message_func:
+            await edit_message_func(message_text, reply_markup=reply_markup)
+        else:
+            await send_message_func(message_text, reply_markup=reply_markup)
+
+    async def _show_main_menu_with_topics_common(
+        self, language: str, send_message_func, edit_message_func=None, message_text: str = None
+    ):
+        """Общая логика отображения главного меню с кнопкой тем"""
+        from orator_translations import get_text
+
+        if message_text is None:
+            message_text = (
+                get_text("main_menu_welcome", language)
+                if hasattr(get_text, "main_menu_welcome")
+                else "Выберите действие:"
+            )
+
+        reply_markup = self._create_main_menu_keyboard(language)
+
+        if edit_message_func:
+            await edit_message_func(message_text, reply_markup=reply_markup)
+        else:
+            await send_message_func(message_text, reply_markup=reply_markup)
+
+    def _create_back_button(self, language: str, callback_data: str = "cancel") -> InlineKeyboardButton:
+        """Создает кнопку 'Назад'"""
+        return InlineKeyboardButton(get_button_text("back", language), callback_data=callback_data)
+
+    def _create_back_keyboard(self, language: str, callback_data: str = "cancel") -> InlineKeyboardMarkup:
+        """Создает клавиатуру с кнопкой 'Назад'"""
+        return InlineKeyboardMarkup([[self._create_back_button(language, callback_data)]])
