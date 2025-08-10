@@ -724,8 +724,8 @@ class OratorDatabaseService:
                             ELSE up.user1_id
                         END as partner_id,
                         CASE 
-                            WHEN up.user1_id = $2 THEN u2.username
-                            ELSE u1.username
+                            WHEN up.user1_id = $2 THEN COALESCE(u2.username, '')
+                            ELSE COALESCE(u1.username, '')
                         END as partner_username,
                         CASE 
                             WHEN up.user1_id = $2 THEN u2.telegram_id
@@ -764,8 +764,8 @@ class OratorDatabaseService:
                             ELSE up.user1_id
                         END as partner_id,
                         CASE 
-                            WHEN up.user1_id = $2 THEN u2.username
-                            ELSE u1.username
+                            WHEN up.user1_id = $2 THEN COALESCE(u2.username, '')
+                            ELSE COALESCE(u1.username, '')
                         END as partner_username,
                         CASE 
                             WHEN up.user1_id = $2 THEN u2.telegram_id
@@ -825,8 +825,8 @@ class OratorDatabaseService:
                         ELSE up.user1_id
                     END as partner_id,
                     CASE 
-                        WHEN up.user1_id = $2 THEN u2.username
-                        ELSE u1.username
+                        WHEN up.user1_id = $2 THEN COALESCE(u2.username, '')
+                        ELSE COALESCE(u1.username, '')
                     END as partner_username,
                     CASE 
                         WHEN up.user1_id = $2 THEN u2.telegram_id
