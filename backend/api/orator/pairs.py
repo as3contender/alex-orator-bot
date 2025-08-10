@@ -118,7 +118,9 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
             }
 
         if partner_profile["username"] is None or partner_profile["username"] == "":
-            user_link = f'<a href="tg://user?id={partner_profile["partner_telegram_id"]}">{escape_html(partner_profile["partner_name"])}</a>'
+            user_link = (
+                f'<a href="tg://user?id={partner_profile["telegram_id"]}">{escape_html(partner_profile["partner_name"])}</a>'
+            )
         else:
             user_link = f"@{partner_profile['username']}"
 
