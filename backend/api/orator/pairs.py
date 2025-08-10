@@ -35,7 +35,7 @@ async def create_pair(
         if user_profile["username"] == "":
             username = ""
         else:
-            username = f" {user_profile['username']}"
+            username = f"{user_profile['username']}"
 
         # Создаем клавиатуру с кнопками подтверждения/отмены
         keyboard = {
@@ -80,7 +80,7 @@ async def confirm_pair(pair_id: str, current_user_id: str = Depends(security_ser
         if candidate_profile["username"] == "":
             username = ""
         else:
-            username = f" {candidate_profile['username']}"
+            username = f"{candidate_profile['username']}"
 
         message_queue = MessageQueue(
             user_id=candidate_profile["telegram_id"],
@@ -134,7 +134,7 @@ async def cancel_pair(pair_id: str, current_user_id: str = Depends(security_serv
             if candidate_profile["username"] == "":
                 username = ""
             else:
-                username = f" {candidate_profile['username']}"
+                username = f"{candidate_profile['username']}"
             message_queue = MessageQueue(
                 user_id=candidate_profile["telegram_id"],
                 message=f"Пара с {user_profile['first_name']} @{username} отменена. Попробуйте найти другую пару.",
