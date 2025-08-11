@@ -556,7 +556,7 @@ class OratorDatabaseService:
                 row = await conn.fetchrow(
                     """
                     SELECT * FROM week_registrations
-                    WHERE user_id = $1 AND status = 'active'
+                    WHERE user_id = $1 AND status = 'active' AND week_end_date >= CURRENT_DATE
                     ORDER BY week_start_date DESC
                     LIMIT 1
                     """,

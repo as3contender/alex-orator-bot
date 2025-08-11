@@ -26,7 +26,6 @@ services:
     container_name: alex-orator-backend-local
     environment:
       - DEBUG=true
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_api_key_here}
       - APP_DATABASE_URL=postgresql://alex_orator:${APP_DATABASE_PASSWORD:-secure_password}@app-db:5432/app_db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - SECRET_KEY=${SECRET_KEY}
