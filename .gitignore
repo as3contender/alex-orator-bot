@@ -104,11 +104,14 @@ celerybeat.pid
 # Environments
 .env
 .venv
+env.local
+env.production
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+deploy.env
 
 # Spyder project settings
 .spyderproject
@@ -133,16 +136,43 @@ dmypy.json
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Project specific
 logs/
 *.log
-data/
-temp_backup/
+backups/
+.env.local
+.env.production
 
-# Exclude embedded git repository
-alex-orator-bot/ 
+# Docker
+.dockerignore
+
+# Kubernetes
+*.kubeconfig
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp 
