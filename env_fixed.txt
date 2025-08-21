@@ -1,0 +1,39 @@
+# Database Configuration - FIXED
+DB_HOST=localhost
+DB_PORT=5434
+DB_NAME=app_db
+DB_USER=alex_orator
+DB_PASSWORD=alex_orator_password
+
+# JWT Configuration
+JWT_SECRET_KEY=your-secret-key-change-in-production
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Redis Configuration (optional)
+REDIS_URL=redis://localhost:6379
+
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your-bot-token-here
+
+# Application Configuration
+APP_ENV=development
+DEBUG=true
+LOG_LEVEL=INFO
+
+# Security
+SECRET_KEY=your-app-secret-key
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Database Pool Configuration
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_TIMEOUT=30
+
+# Logging Configuration
+LOG_FILE=logs/app.log
+LOG_MAX_SIZE=10MB
+LOG_BACKUP_COUNT=5
+
+# Fixed Database Connection String
+DATABASE_URL=postgresql://alex_orator:alex_orator_password@localhost:5434/app_db

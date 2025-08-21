@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL для приложения
+  app-db:
+    image: postgres:15-alpine
+    container_name: alex-orator-bot-app-db
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: alex_orator
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_parallel_maintenance_workers=4
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+      - ./deployment/init-app-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - alex-orator-network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build: ./backend
+    container_name: alex-orator-bot-backend
+    environment:
+      - DEBUG=false
+      - APP_DATABASE_URL=postgresql://alex_orator:${APP_DB_PASSWORD:-secure_password}@app-db:5432/app_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-jwt-secret-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+    ports:
+      - "8001:8000"
+    depends_on:
+      - app-db
+    networks:
+      - alex-orator-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  # Telegram Bot
+  telegram-bot:
+    build: ./telegram-bot
+    container_name: alex-orator-bot-telegram
+    environment:
+      - TELEGRAM_TOKEN=${BOT_TOKEN}
+      - BACKEND_URL=http://backend:8000
+      - LOG_LEVEL=INFO
+    depends_on:
+      - backend
+    networks:
+      - alex-orator-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  # Message Queue Worker
+  worker:
+    build: ./worker
+    container_name: alex-orator-bot-worker
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - APP_DATABASE_HOST=app-db
+      - APP_DATABASE_PORT=5432
+      - APP_DATABASE_LOGIN=alex_orator
+      - APP_DATABASE_PASSWORD=${APP_DB_PASSWORD:-secure_password}
+      - APP_DATABASE_NAME=app_db
+    depends_on:
+      - app-db
+      - telegram-bot
+    networks:
+      - alex-orator-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  app-db-data:
+    driver: local
+
+networks:
+  alex-orator-network:
+    driver: bridge 

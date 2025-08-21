@@ -1,0 +1,24 @@
+# Основные настройки
+DEBUG=false
+SECRET_KEY=your-secret-key-change-in-production
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-3.5-turbo
+OPENAI_MAX_TOKENS=1000
+OPENAI_TEMPERATURE=0.1
+
+# Базы данных
+APP_DATABASE_URL=postgresql://user:pass@localhost:5432/app_db
+
+# JWT
+JWT_SECRET_KEY=your-jwt-secret-key-change-in-production
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# CORS
+CORS_ORIGINS=["*"]
+
+# Логирование
+LOG_LEVEL=INFO
+LOG_FILE=logs/backend.log 

@@ -1,0 +1,41 @@
+# Alex Orator Bot - Python Dependencies
+# Основные зависимости для генерации ключей и утилит
+
+# Криптографические библиотеки
+cryptography>=41.0.0
+PyJWT>=2.8.0
+
+# Утилиты для работы с переменными окружения
+python-dotenv>=1.0.0
+
+# Для работы с базами данных (если понадобится)
+psycopg2-binary>=2.9.0
+
+# HTTP клиент для API
+requests>=2.31.0
+
+# Логирование
+colorlog>=6.7.0
+
+# Утилиты для работы с датами
+python-dateutil>=2.8.0
+
+# Для валидации данных
+pydantic>=2.0.0
+
+# Для асинхронной работы (если понадобится)
+aiohttp>=3.8.0
+asyncio-mqtt>=0.13.0
+
+# Для тестирования
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Для разработки
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Telegram Bot Dependencies
+aiogram>=3.21.0
+asyncpg>=0.30.0 

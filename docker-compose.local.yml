@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL для приложения
+  app-db:
+    image: postgres:15-alpine
+    container_name: alex-orator-app-db-local
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: alex_orator
+      POSTGRES_PASSWORD: ${APP_DATABASE_PASSWORD:-secure_password}
+    volumes:
+      - alex-orator-app-db-data-local:/var/lib/postgresql/data
+      - ./deployment/init-orator-app-db.sql:/docker-entrypoint-initdb.d/init-orator-app-db.sql
+    ports:
+      - "5434:5432"
+    networks:
+      - alex-orator-local-network
+    restart: unless-stopped
+
+  # Backend API (для разработки)
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: alex-orator-backend-local
+    environment:
+      - DEBUG=true
+      - APP_DATABASE_URL=postgresql://alex_orator:${APP_DATABASE_PASSWORD:-secure_password}@app-db:5432/app_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-jwt-secret}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - app-db
+    networks:
+      - alex-orator-local-network
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Alex Orator Bot (для разработки)
+  orator-bot:
+    build: 
+      context: ./telegram-bot
+      dockerfile: Dockerfile
+    container_name: alex-orator-bot-local
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN:-your_telegram_bot_token_here}
+      - BACKEND_URL=http://backend:8000
+      - API_TIMEOUT=30
+      - API_RETRY_ATTEMPTS=3
+      - API_RETRY_DELAY=1
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - backend
+    networks:
+      - alex-orator-local-network
+    restart: unless-stopped
+    volumes:
+      - ./telegram-bot:/app
+      - ./logs:/app/logs
+    command: python orator_bot.py
+
+  # Message Queue Worker (для разработки)
+  worker:
+    build: 
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: alex-orator-worker-local
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN:-your_telegram_bot_token_here}
+      - APP_DATABASE_HOST=app-db
+      - APP_DATABASE_PORT=5432
+      - APP_DATABASE_LOGIN=alex_orator
+      - APP_DATABASE_PASSWORD=${APP_DATABASE_PASSWORD:-secure_password}
+      - APP_DATABASE_NAME=app_db
+      - WORKER_CHECK_INTERVAL=2
+      - WORKER_BATCH_SIZE=50
+      - WORKER_CONCURRENCY=10
+      - WORKER_DRAIN_TIMEOUT=30
+    depends_on:
+      - app-db
+      - orator-bot
+    networks:
+      - alex-orator-local-network
+    restart: unless-stopped
+    volumes:
+      - ./worker:/app
+      - ./logs:/app/logs
+    command: python send_worker.py
+
+volumes:
+  alex-orator-app-db-data-local:
+    driver: local
+
+networks:
+  alex-orator-local-network:
+    driver: bridge 
