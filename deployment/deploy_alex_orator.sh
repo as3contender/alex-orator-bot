@@ -34,6 +34,7 @@ load_env() {
   : "${DEPLOY_BACKEND:=true}"
   : "${DEPLOY_BOT:=true}"
   : "${DEPLOY_WORKER:=true}"   # включил по умолчанию, чтобы воркер тоже катался
+  : "${DEPLOY_ADMIN_PANEL:=false}"   # админ-панель по умолчанию отключена для безопасности
 }
 
 # ---------------- SSH helper ----------------
@@ -77,7 +78,7 @@ sync_files() {
   fi
 
   # Sync service directories if present
-  for d in backend telegram-bot worker; do
+  for d in backend telegram-bot worker admin-panel; do
     if [ -d "$PROJECT_ROOT/$d" ]; then
       rsync -avz --delete -e "$SSH_CMD" \
         "$PROJECT_ROOT/$d/" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DEPLOY_DIR}/$d/"
@@ -136,6 +137,7 @@ SVC_DB="app-db"
 SVC_BACKEND="backend"
 SVC_BOT="telegram-bot"
 SVC_WORKER="worker"
+SVC_ADMIN_PANEL="admin-panel"
 
 compose_up_if_exists() {
   local svc="$1"
@@ -160,7 +162,7 @@ main() {
 
   echo -e "${BLUE}🔑 Target: ${REMOTE_USER}@${REMOTE_HOST}${NC}"
   echo -e "${BLUE}📁 Remote dir: ${REMOTE_DEPLOY_DIR}${NC}"
-  echo -e "${BLUE}⚙️  Plan: DB=${DEPLOY_DATABASES} BACKEND=${DEPLOY_BACKEND} BOT=${DEPLOY_BOT} WORKER=${DEPLOY_WORKER}${NC}"
+  echo -e "${BLUE}⚙️  Plan: DB=${DEPLOY_DATABASES} BACKEND=${DEPLOY_BACKEND} BOT=${DEPLOY_BOT} WORKER=${DEPLOY_WORKER} ADMIN_PANEL=${DEPLOY_ADMIN_PANEL}${NC}"
 
   $SSH_CMD "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p '$REMOTE_DEPLOY_DIR'"
 
@@ -182,6 +184,11 @@ main() {
   if [ "$DEPLOY_WORKER" = "true" ]; then
     sync_files
     compose_up_if_exists "$SVC_WORKER"
+  fi
+
+  if [ "$DEPLOY_ADMIN_PANEL" = "true" ]; then
+    sync_files
+    compose_up_if_exists "$SVC_ADMIN_PANEL"
   fi
 
   echo -e "${BLUE}📋 Status:${NC}"

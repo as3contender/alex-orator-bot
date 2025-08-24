@@ -74,6 +74,12 @@ python3 -c "import secrets, base64; print('JWT_SECRET_KEY=' + base64.b64encode(s
 ./deploy_alex_orator.sh --bot-only
 ```
 
+### Только Admin Panel:
+```bash
+# Настройте deploy.env: DEPLOY_ADMIN_PANEL=true, остальные false
+./deploy_alex_orator.sh
+```
+
 ### Без баз данных (использовать внешние):
 ```bash
 ./deploy_alex_orator.sh --no-db
@@ -98,6 +104,15 @@ python3 -c "import secrets, base64; print('JWT_SECRET_KEY=' + base64.b64encode(s
 - Swagger документация на `/docs`
 
 ### 🤖 Telegram Bot (если включен):
+- **telegram-bot**: Telegram бот сервер
+- Автоматическая обработка команд
+- Интеграция с backend API
+
+### 🛠️ Admin Panel (если включен):
+- **admin-panel**: Веб-интерфейс для управления (порт 8501)
+- Управление контентом и пользователями
+- Безопасная аутентификация с bcrypt и JWT
+- **По умолчанию отключен для безопасности**
 - **telegram-bot**: Telegram бот
 - Подключается к backend через внутреннюю сеть
 
@@ -122,6 +137,9 @@ ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs -f backend'
 
 # Только bot
 ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs -f telegram-bot'
+
+# Только admin-panel
+ssh user@server 'cd /opt/alex-orator-bot && docker-compose logs -f admin-panel'
 ```
 
 ### Перезапуск:
@@ -229,6 +247,8 @@ ssh user@server 'docker exec -it alex-orator-bot-app-db psql -U alex_orator -d a
 DEPLOY_BACKEND=true
 DEPLOY_BOT=true
 DEPLOY_DATABASES=true
+DEPLOY_WORKER=true
+DEPLOY_ADMIN_PANEL=false  # Включите при необходимости
 DEBUG=false
 LOG_LEVEL=INFO
 ```
@@ -238,9 +258,17 @@ LOG_LEVEL=INFO
 DEPLOY_BACKEND=true
 DEPLOY_BOT=false
 DEPLOY_DATABASES=true
+DEPLOY_WORKER=false
+DEPLOY_ADMIN_PANEL=true   # Удобно для разработки
 DEBUG=true
 LOG_LEVEL=DEBUG
 ```
+
+## 📚 Дополнительная документация
+
+- **[Admin Panel Deployment](./ADMIN_PANEL_DEPLOYMENT.md)** - Подробное руководство по деплою админ-панели
+- **[Security Guide](../admin-panel/docs/README_SECURITY.md)** - Руководство по безопасности админ-панели
+- **[Docker Setup](../admin-panel/docs/DOCKER_SETUP.md)** - Настройка Docker для админ-панели
 
 ---
 
