@@ -200,6 +200,95 @@ class OratorBaseHandler:
             logger.error(f"MyTasks common handler error: {e}")
             await send_message_func(get_text("error_unknown", "ru"))
 
+    async def _handle_find_candidates_common(self, language: str, send_message_func, edit_message_func=None):
+        """Общая логика поиска кандидатов (для команды и callback)"""
+        try:
+            # Получаем текущую регистрацию
+            registration = await self.api_client.get_current_registration()
+            if not registration:
+                await send_message_func("Сначала зарегистрируйтесь на неделю: /register")
+                return
+
+            # Ищем кандидатов
+            match_request = {"week_start_date": registration["week_start_date"], "limit": 5}
+            candidates_response = await self.api_client.find_candidates(match_request)
+            candidates = candidates_response.get("candidates", [])
+
+            if not candidates:
+                await send_message_func(get_text("find_candidates_no_results", language))
+                return
+
+            # Создаем кнопки для кандидатов
+            keyboard = []
+            for candidate in candidates[:5]:
+                name = candidate.get("name", "Пользователь")
+                score = candidate.get("match_score", 0)
+                preferred_time = candidate.get("preferred_time_msk", "Не указано")
+                selected_topics = candidate.get("selected_topics", [])
+
+                # Берем первую тему или показываем "Не выбрано"
+                topic_display = selected_topics[0] if selected_topics else "Не выбрано"
+
+                # Формируем текст кнопки
+                button_text = f"{name} {preferred_time}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"candidate_{candidate['user_id']}")])
+
+            keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="cancel")])
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            message_text = get_text("find_candidates_success", language).format(count=len(candidates))
+
+            if edit_message_func:
+                await edit_message_func(message_text, reply_markup=reply_markup)
+            else:
+                await send_message_func(message_text, reply_markup=reply_markup)
+
+            logger.info(f"User requested find candidates, found {len(candidates)} candidates")
+
+        except Exception as e:
+            logger.error(f"Find candidates common handler error: {e}")
+            await send_message_func(get_text("error_unknown", "ru"))
+
+    async def _handle_pairs_common(self, language: str, send_message_func, edit_message_func=None):
+        """Общая логика обработки пар для сообщений и callback"""
+        try:
+            # Получаем пары пользователя
+            pairs = await self.api_client.get_user_pairs()
+
+            if not pairs:
+                await send_message_func(get_text("pairs_empty", language))
+                return
+
+            # Формируем список пар как кнопки
+            pairs_text = get_text("pairs_welcome", language) + "\n\nВыберите пару:"
+            keyboard = []
+
+            for i, pair in enumerate(pairs[:5], 1):
+                partner_name = pair.get("partner_name", "Пользователь")
+                status = pair.get("status", "unknown")
+                pair_id = pair.get("id")
+
+                status_emoji = "✅" if status == "confirmed" else "⏳" if status == "pending" else "❌"
+                button_text = f"{i}. {status_emoji} {partner_name} ({status})"
+
+                # Каждая пара - это кнопка
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"pair_details_{pair_id}")])
+
+            keyboard.append([self._create_back_button(language, "cancel")])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Отправляем сообщение
+            if edit_message_func:
+                await edit_message_func(pairs_text, reply_markup=reply_markup)
+            else:
+                await send_message_func(pairs_text, reply_markup=reply_markup)
+
+            logger.info(f"User requested pairs, found {len(pairs)} pairs")
+
+        except Exception as e:
+            logger.error(f"Pairs common handler error: {e}")
+            await send_message_func(get_text("error_unknown", "ru"))
+
     def _create_main_menu_keyboard(self, language: str) -> InlineKeyboardMarkup:
         """Создает клавиатуру главного меню"""
         keyboard = [

@@ -73,24 +73,12 @@ class RegistrationHandler(OratorBaseHandler):
         # Показываем выбор времени
         keyboard = [
             [
-                InlineKeyboardButton("09:00", callback_data="time_09:00"),
-                InlineKeyboardButton("10:00", callback_data="time_10:00"),
-                InlineKeyboardButton("11:00", callback_data="time_11:00"),
+                InlineKeyboardButton("🕗 Утро (6:00–11:59)", callback_data="time_06:00"),
+                InlineKeyboardButton("🌞 День (12:00–17:59)", callback_data="time_12:00"),
             ],
             [
-                InlineKeyboardButton("12:00", callback_data="time_12:00"),
-                InlineKeyboardButton("13:00", callback_data="time_13:00"),
-                InlineKeyboardButton("14:00", callback_data="time_14:00"),
-            ],
-            [
-                InlineKeyboardButton("15:00", callback_data="time_15:00"),
-                InlineKeyboardButton("16:00", callback_data="time_16:00"),
-                InlineKeyboardButton("17:00", callback_data="time_17:00"),
-            ],
-            [
-                InlineKeyboardButton("18:00", callback_data="time_18:00"),
-                InlineKeyboardButton("19:00", callback_data="time_19:00"),
-                InlineKeyboardButton("20:00", callback_data="time_20:00"),
+                InlineKeyboardButton("🌇 Вечер (18:00–23:59)", callback_data="time_18:00"),
+                InlineKeyboardButton("🌙 Ночь (00:00–05:59)", callback_data="time_00:00"),
             ],
             [InlineKeyboardButton(get_button_text("back", language), callback_data="register")],
         ]
@@ -98,8 +86,8 @@ class RegistrationHandler(OratorBaseHandler):
 
         week_text = "Текущая неделя" if week_type == "current" else "Следующая неделя"
         await query.edit_message_text(
-            f"Выбрана неделя: {week_text}\n\nВыберите предпочитаемое время:",
-            reply_markup=reply_markup
+            f"Выбрана неделя: {week_text}\n\nВыберите предпочитаемое время.\n\n❗️Это лишь желаемое время – о точном нужно договориться с партнёром в переписке",
+            reply_markup=reply_markup,
         )
 
     async def handle_time_selection(self, query, callback_data: str, language: str):
@@ -116,7 +104,9 @@ class RegistrationHandler(OratorBaseHandler):
         message_text = f"✅ Время выбрано: {selected_time}\n\nТеперь выберите тему для тренировки:"
 
         # Показываем сообщение и возвращаем True для перехода к темам
-        await query.edit_message_text(message_text, )
+        await query.edit_message_text(
+            message_text,
+        )
         return True  # Переходим к выбору тем
 
     async def create_registration_with_topic(self, topic_id: str):
@@ -158,7 +148,7 @@ class RegistrationHandler(OratorBaseHandler):
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 "✅ Регистрация успешно отменена!\n\nТеперь вы можете зарегистрироваться снова.",
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
             )
         except Exception as e:
             logger.error(f"Cancel registration error: {e}")
@@ -167,6 +157,5 @@ class RegistrationHandler(OratorBaseHandler):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                "❌ Ошибка при отмене регистрации. Попробуйте позже.",
-                reply_markup=reply_markup
+                "❌ Ошибка при отмене регистрации. Попробуйте позже.", reply_markup=reply_markup
             )

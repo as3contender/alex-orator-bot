@@ -147,42 +147,7 @@ class CallbackHandler(OratorBaseHandler):
     # Простые обработчики, которые остались в главном файле
     async def _handle_find_callback(self, query, language: str):
         """Обработка поиска кандидатов"""
-        # Получаем текущую регистрацию
-        registration = await self.api_client.get_current_registration()
-        if not registration:
-            await query.edit_message_text("Сначала зарегистрируйтесь на неделю: /register")
-            return
-
-        # Ищем кандидатов
-        match_request = {"week_start_date": registration["week_start_date"], "limit": 5}
-        candidates_response = await self.api_client.find_candidates(match_request)
-        candidates = candidates_response.get("candidates", [])
-
-        if not candidates:
-            await query.edit_message_text(get_text("find_candidates_no_results", language))
-            return
-
-        # Создаем кнопки для кандидатов
-        keyboard = []
-        for candidate in candidates[:5]:
-            name = candidate.get("name", "Пользователь")
-            score = candidate.get("match_score", 0)
-            preferred_time = candidate.get("preferred_time_msk", "Не указано")
-            selected_topics = candidate.get("selected_topics", [])
-
-            # Берем первую тему или показываем "Не выбрано"
-            topic_display = selected_topics[0] if selected_topics else "Не выбрано"
-
-            # Формируем текст кнопки в новом формате
-            button_text = f"{name} [{topic_display}] {preferred_time} (совпадение: {score:.1%})"
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"candidate_{candidate['user_id']}")])
-
-        keyboard.append([InlineKeyboardButton(get_button_text("cancel", language), callback_data="cancel")])
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            get_text("find_candidates_success", language).format(count=len(candidates)), reply_markup=reply_markup
-        )
+        await self._handle_find_candidates_common(language, query.edit_message_text)
 
     async def _handle_profile_callback(self, query, language: str):
         """Обработка профиля"""

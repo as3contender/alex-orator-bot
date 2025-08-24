@@ -136,6 +136,34 @@ class CommandHandler(OratorBaseHandler):
             logger.error(f"Menu command error: {e}")
             await update.message.reply_text(get_text("error_unknown", "ru"))
 
+    async def find_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /find - поиск кандидатов"""
+        try:
+            if not await self._authenticate_user(update):
+                await update.message.reply_text(get_text("error_authentication", "ru"))
+                return
+
+            language = await self._get_user_language(update)
+            await self._handle_find_candidates_common(language, update.message.reply_text)
+
+        except Exception as e:
+            logger.error(f"Find command error: {e}")
+            await update.message.reply_text(get_text("error_unknown", "ru"))
+
+    async def pairs_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /pairs - мои пары"""
+        try:
+            if not await self._authenticate_user(update):
+                await update.message.reply_text(get_text("error_authentication", "ru"))
+                return
+
+            language = await self._get_user_language(update)
+            await self._handle_pairs_common(language, update.message.reply_text)
+
+        except Exception as e:
+            logger.error(f"Pairs command error: {e}")
+            await update.message.reply_text(get_text("error_unknown", "ru"))
+
     async def mytasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /mytasks - показывает упражнения по зарегистрированной теме"""
         try:
@@ -166,6 +194,9 @@ class CommandHandler(OratorBaseHandler):
                 "• /menu - главное меню\n"
                 "• /help - справка\n"
                 "• /start - перезапуск бота\n"
+                "• /register - регистрация на неделю\n"
+                "• /find - поиск кандидатов\n"
+                "• /pairs - мои пары\n"
                 "• /mytasks - ваши задания на эту неделю"
             )
 

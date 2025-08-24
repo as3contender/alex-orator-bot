@@ -37,6 +37,10 @@ class AlexOratorBot:
         self.application.add_handler(CommandHandler("menu", self.command_handler.menu_command))
         self.application.add_handler(CommandHandler("mytasks", self.command_handler.mytasks_command))
 
+        # Команды поиска и пар
+        self.application.add_handler(CommandHandler("find", self.command_handler.find_command))
+        self.application.add_handler(CommandHandler("pairs", self.command_handler.pairs_command))
+
         # Обработка меню
         self.menu_keyboard = self._build_menu_keyboard()
         self._setup_menu_handler()
