@@ -7,24 +7,40 @@ from urllib.parse import quote_plus
 import os
 from datetime import datetime
 
+# Попытка импорта из env_config.py, если доступен
+try:
+    from env_config import ADMIN_DB_PASSWORD, ADMIN_DB_USER, ADMIN_DB_HOST, ADMIN_DB_PORT, ADMIN_DB_NAME
+    USE_CONFIG_FILE = True
+except ImportError:
+    USE_CONFIG_FILE = False
+
 
 class AdminDatabase:
     def __init__(self):
         self.conn = None
-        # Подключение к существующей базе данных через переменные окружения
-        db_host = os.getenv("DB_HOST", "localhost")
-        db_port = os.getenv("DB_PORT", "5434")
-        db_name = os.getenv("DB_NAME", "app_db")
-        db_user = os.getenv("DB_USER", "alex_orator")
-        db_password = os.getenv("APP_DB_PASSWORD")  # Из deploy.env
+        
+        if USE_CONFIG_FILE:
+            # Используем файл конфигурации
+            password = ADMIN_DB_PASSWORD
+            db_user = ADMIN_DB_USER
+            db_host = ADMIN_DB_HOST
+            db_port = ADMIN_DB_PORT
+            db_name = ADMIN_DB_NAME
+        else:
+            # Используем переменные окружения
+            db_host = os.getenv("DB_HOST", "localhost")
+            db_port = os.getenv("DB_PORT", "5434")
+            db_name = os.getenv("DB_NAME", "app_db")
+            db_user = os.getenv("DB_USER", "alex_orator")
+            password = os.getenv("APP_DB_PASSWORD")  # Из deploy.env
 
-        if not db_password:
-            raise ValueError("APP_DB_PASSWORD не установлен в переменных окружения")
+        if not password:
+            raise ValueError("Пароль базы данных не установлен ни в файле конфигурации, ни в переменных окружения")
 
-        encoded_password = quote_plus(db_password)
+        encoded_password = quote_plus(password)
         self.database_url = f"postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}"
         print(f"🔗 Подключение к базе: postgresql://{db_user}:***@{db_host}:{db_port}/{db_name}")
-
+    
     def connect(self):
         """Подключение к базе данных"""
         try:
