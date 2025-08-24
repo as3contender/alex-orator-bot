@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import os
 import io
-from database import get_db
+from database.database import get_db
 from datetime import datetime
 from typing import Dict, Any, Optional
 

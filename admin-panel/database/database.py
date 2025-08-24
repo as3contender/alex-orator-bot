@@ -7,6 +7,15 @@ from urllib.parse import quote_plus
 import os
 from datetime import datetime
 
+# Загружаем переменные окружения из .env файла
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    print("✅ Переменные окружения загружены в database.py")
+except ImportError:
+    print("⚠️ python-dotenv не установлен, используем системные переменные окружения")
+
 
 class AdminDatabase:
     def __init__(self):
@@ -548,7 +557,7 @@ class AdminDatabase:
                         """
                         SELECT id, telegram_id, username, first_name, last_name, 
                                gender, registration_date, total_sessions, 
-                               feedback_count, is_active, created_at, updated_at, password, role
+                               feedback_count, is_active, created_at, updated_at, hashed_password
                         FROM users 
                         ORDER BY created_at DESC
                     """
@@ -566,7 +575,7 @@ class AdminDatabase:
                         """
                         SELECT id, telegram_id, username, first_name, last_name, 
                                gender, registration_date, total_sessions, 
-                               feedback_count, is_active, created_at, updated_at, password
+                               feedback_count, is_active, created_at, updated_at, hashed_password
                         FROM users 
                         ORDER BY created_at DESC
                     """
@@ -633,9 +642,9 @@ class AdminDatabase:
                     cursor.execute(
                         """
                         INSERT INTO users (id, username, first_name, last_name, 
-                                         telegram_id, is_active, gender, password, role,
+                                         telegram_id, is_active, gender, hashed_password,
                                          created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                         (
                             user_id,
@@ -646,7 +655,6 @@ class AdminDatabase:
                             True,
                             "other",
                             hashed_password,
-                            role,
                             datetime.now(),
                             datetime.now(),
                         ),
@@ -660,7 +668,7 @@ class AdminDatabase:
                     cursor.execute(
                         """
                         INSERT INTO users (id, username, first_name, last_name, 
-                                         telegram_id, is_active, gender, password,
+                                         telegram_id, is_active, gender, hashed_password,
                                          created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
@@ -703,7 +711,7 @@ class AdminDatabase:
                     cursor.execute(
                         """
                         SELECT id, username, first_name, last_name, 
-                               telegram_id, is_active, gender, password, role,
+                               telegram_id, is_active, gender, hashed_password,
                                created_at, updated_at
                         FROM users 
                         WHERE username = %s AND is_active = TRUE
@@ -724,7 +732,7 @@ class AdminDatabase:
                     cursor.execute(
                         """
                         SELECT id, username, first_name, last_name, 
-                               telegram_id, is_active, gender, password,
+                               telegram_id, is_active, gender, hashed_password,
                                created_at, updated_at
                         FROM users 
                         WHERE username = %s AND is_active = TRUE
@@ -815,21 +823,42 @@ class AdminDatabase:
             return False
 
 
-# Создание глобального экземпляра
-db = AdminDatabase()
+# Глобальный экземпляр (ленивая инициализация)
+_db_instance = None
 
 
 def init_database():
     """Инициализация подключения к базе данных"""
-    db.connect()
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = AdminDatabase()
+    _db_instance.connect()
 
 
 def close_database():
     """Закрытие подключения к базе данных"""
-    db.disconnect()
+    global _db_instance
+    if _db_instance:
+        _db_instance.disconnect()
 
 
 # Для использования в Streamlit
 def get_db():
     """Получить экземпляр базы данных"""
-    return db
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = AdminDatabase()
+    return _db_instance
+
+
+# Создаем экземпляр только при явном вызове
+def create_db_instance():
+    """Создать экземпляр базы данных (для обратной совместимости)"""
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = AdminDatabase()
+    return _db_instance
+
+
+# Для обратной совместимости
+db = property(get_db)

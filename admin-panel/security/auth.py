@@ -4,7 +4,7 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import jwt
-from database import get_db
+from database.database import get_db
 from sqlalchemy import text
 
 # Настройка логирования
@@ -97,9 +97,10 @@ def authenticate_user(username, password):
                         # Проверяем пароль с использованием bcrypt
                         hashed_password = row[0]
                         try:
-                            from security import security_manager
+                            from .security import get_security_manager
 
-                            if security_manager.verify_password(password, hashed_password):
+                            sec_manager = get_security_manager()
+                            if sec_manager.verify_password(password, hashed_password):
                                 logger.info(f"Успешная авторизация администратора {username} из БД")
                                 return True
                             else:
@@ -119,11 +120,11 @@ def authenticate_user(username, password):
                 users_table_exists = result.scalar()
 
                 if users_table_exists:
-                    # Ищем пользователя в таблице users
+                    # Ищем пользователя в таблице users (системные администраторы)
                     user_query = text(
                         """
-                        SELECT password FROM users 
-                        WHERE username = :username AND is_active = true
+                        SELECT hashed_password FROM users 
+                        WHERE username = :username AND is_active = true AND telegram_id IS NULL
                     """
                     )
 
@@ -135,9 +136,10 @@ def authenticate_user(username, password):
                         hashed_password = row[0]
                         if hashed_password:
                             try:
-                                from security import security_manager
+                                from .security import get_security_manager
 
-                                if security_manager.verify_password(password, hashed_password):
+                                sec_manager = get_security_manager()
+                                if sec_manager.verify_password(password, hashed_password):
                                     logger.info(f"Успешная авторизация пользователя {username} из БД")
                                     return True
                                 else:
@@ -366,12 +368,12 @@ def get_user_info(username):
                 users_table_exists = result.scalar()
 
                 if users_table_exists:
-                    # Ищем пользователя в таблице users
+                    # Ищем пользователя в таблице users (системные администраторы)
                     user_query = text(
                         """
-                        SELECT id, username, first_name, last_name, is_active, created_at, role
+                        SELECT id, username, is_active, created_at
                         FROM users 
-                        WHERE username = :username AND is_active = true
+                        WHERE username = :username AND is_active = true AND telegram_id IS NULL
                     """
                     )
 
@@ -379,25 +381,18 @@ def get_user_info(username):
                     row = result.fetchone()
 
                     if row:
-                        full_name = f"{row[2] or ''} {row[3] or ''}".strip()
-
-                        # Получаем роль пользователя из БД
-                        user_role = row[6] if len(row) > 6 else "user"
-
-                        # Определяем тип пользователя на основе роли
-                        if user_role in ["super_admin", "admin", "moderator"]:
-                            user_type = "admin"
-                        else:
-                            user_type = "user"
+                        # Для системных администраторов устанавливаем роль admin
+                        user_role = "admin"
+                        user_type = "admin"
 
                         return {
                             "id": row[0],
                             "username": row[1],
-                            "full_name": full_name or row[1],
-                            "role": user_role,  # Используем реальную роль из БД
-                            "is_active": row[4],
+                            "full_name": row[1],  # Используем username как full_name
+                            "role": user_role,
+                            "is_active": row[2],
                             "last_login": None,
-                            "created_at": row[5],
+                            "created_at": row[3],
                             "user_type": user_type,
                         }
 
@@ -563,66 +558,5 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return auth.verify_password(plain_password, hashed_password)
 
 
-def create_default_admin():
-    """Создание администратора по умолчанию"""
-    try:
-        db = get_db()
-
-        # Проверяем, существует ли уже администратор
-        existing_admin = db.get_admin_by_username("admin")
-        if existing_admin:
-            print("✅ Администратор по умолчанию уже существует")
-            return existing_admin
-
-        # Создаем администратора по умолчанию
-        hashed_password = hash_password("admin123")
-        admin = db.create_admin_user(
-            username="admin", hashed_password=hashed_password, full_name="Администратор", role="super_admin"
-        )
-
-        if admin:
-            print("✅ Администратор по умолчанию успешно создан")
-            return admin
-        else:
-            print("❌ Ошибка создания администратора по умолчанию")
-            return None
-
-    except Exception as e:
-        print(f"❌ Ошибка создания администратора по умолчанию: {e}")
-        return None
-
-    return auth._hash_password(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Проверка пароля"""
-    return auth.verify_password(plain_password, hashed_password)
-
-
-def create_default_admin():
-    """Создание администратора по умолчанию"""
-    try:
-        db = get_db()
-
-        # Проверяем, существует ли уже администратор
-        existing_admin = db.get_admin_by_username("admin")
-        if existing_admin:
-            print("✅ Администратор по умолчанию уже существует")
-            return existing_admin
-
-        # Создаем администратора по умолчанию
-        hashed_password = hash_password("admin123")
-        admin = db.create_admin_user(
-            username="admin", hashed_password=hashed_password, full_name="Администратор", role="super_admin"
-        )
-
-        if admin:
-            print("✅ Администратор по умолчанию успешно создан")
-            return admin
-        else:
-            print("❌ Ошибка создания администратора по умолчанию")
-            return None
-
-    except Exception as e:
-        print(f"❌ Ошибка создания администратора по умолчанию: {e}")
-        return None
+# Функция create_default_admin перенесена в utils/migrate_passwords.py
+# Используйте: from utils.migrate_passwords import create_default_admin

@@ -2,10 +2,10 @@
 
 import streamlit as st
 import pandas as pd
-from database import get_db
+from database.database import get_db
 from datetime import datetime
 import uuid
-from access_control import get_user_permissions, check_permission, show_access_denied
+from security.access_control import get_user_permissions, check_permission, show_access_denied
 
 
 def users_management_page():
