@@ -61,7 +61,7 @@ services:
     build: ./telegram-bot
     container_name: alex-orator-bot-telegram
     environment:
-      - TELEGRAM_TOKEN=${BOT_TOKEN}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - BACKEND_URL=http://backend:8000
       - LOG_LEVEL=INFO
     depends_on:
@@ -77,7 +77,7 @@ services:
     build: ./worker
     container_name: alex-orator-bot-worker
     environment:
-      - BOT_TOKEN=${BOT_TOKEN}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - APP_DATABASE_HOST=app-db
       - APP_DATABASE_PORT=5432
       - APP_DATABASE_LOGIN=alex_orator

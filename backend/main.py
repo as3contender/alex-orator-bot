@@ -34,10 +34,11 @@ app.add_middleware(
 # Подключение роутеров
 app.include_router(api_router, prefix="/api/v1")
 
-# Подключение статических файлов
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Подключение статических файлов (если директория существует)
+import os
 
-
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.exception_handler(Exception)
