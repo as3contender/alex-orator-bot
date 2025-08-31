@@ -23,7 +23,7 @@ class AdminDatabase:
         self.conn = None
         # Подключение к существующей базе данных через переменные окружения
         db_host = os.getenv("DB_HOST", "localhost")
-        db_port = os.getenv("DB_PORT", "5434")
+        db_port = os.getenv("DB_PORT", "5432")
         db_name = os.getenv("DB_NAME", "app_db")
         db_user = os.getenv("DB_USER", "alex_orator")
         db_password = os.getenv("APP_DB_PASSWORD")  # Из deploy.env
