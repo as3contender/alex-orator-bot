@@ -227,3 +227,15 @@ class OratorAPIClient:
     async def reset_user_settings(self) -> Dict[str, str]:
         """Сбросить настройки пользователя"""
         return await self._make_request("DELETE", "/api/v1/settings")
+
+    # ============================================================================
+    # УНИВЕРСАЛЬНЫЕ МЕТОДЫ
+    # ============================================================================
+
+    async def post(self, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Универсальный POST запрос"""
+        return await self._make_request("POST", endpoint, **kwargs)
+
+    async def get(self, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Универсальный GET запрос"""
+        return await self._make_request("GET", endpoint, **kwargs)

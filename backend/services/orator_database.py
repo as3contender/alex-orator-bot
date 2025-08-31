@@ -29,7 +29,8 @@ class OratorDatabaseService:
         """Подключение к базе данных"""
         try:
             self.pool = await asyncpg.create_pool(self.database_url)
-            await self._create_orator_tables()
+            # Временно отключаем создание таблиц для отладки
+            # await self._create_orator_tables()
             logger.info("Connected to orator database")
         except Exception as e:
             logger.error(f"Failed to connect to orator database: {e}")
@@ -1197,33 +1198,35 @@ class OratorDatabaseService:
             query = "SELECT id, content_key, content_text, language, is_active, created_at, updated_at FROM bot_content WHERE 1=1"
             params = []
             param_count = 0
-            
+
             if language:
                 param_count += 1
                 query += f" AND language = ${param_count}"
                 params.append(language)
-            
+
             if is_active is not None:
                 param_count += 1
                 query += f" AND is_active = ${param_count}"
                 params.append(is_active)
-            
+
             query += " ORDER BY content_key, language"
-            
+
             rows = await conn.fetch(query, *params)
-            
+
             content_list = []
             for row in rows:
-                content_list.append({
-                    "id": row["id"],
-                    "content_key": row["content_key"],
-                    "content_text": row["content_text"],
-                    "language": row["language"],
-                    "is_active": row["is_active"],
-                    "created_at": row["created_at"],
-                    "updated_at": row["updated_at"]
-                })
-            
+                content_list.append(
+                    {
+                        "id": row["id"],
+                        "content_key": row["content_key"],
+                        "content_text": row["content_text"],
+                        "language": row["language"],
+                        "is_active": row["is_active"],
+                        "created_at": row["created_at"],
+                        "updated_at": row["updated_at"],
+                    }
+                )
+
             return content_list
 
     async def get_bot_content_by_key(self, content_key: str, language: str = "ru") -> Optional[Dict[str, Any]]:
@@ -1238,10 +1241,10 @@ class OratorDatabaseService:
                 content_key,
                 language,
             )
-            
+
             if not row:
                 return None
-            
+
             return {
                 "id": row["id"],
                 "content_key": row["content_key"],
@@ -1249,7 +1252,7 @@ class OratorDatabaseService:
                 "language": row["language"],
                 "is_active": row["is_active"],
                 "created_at": row["created_at"],
-                "updated_at": row["updated_at"]
+                "updated_at": row["updated_at"],
             }
 
     async def create_bot_content(self, content_data) -> Dict[str, Any]:
@@ -1265,7 +1268,7 @@ class OratorDatabaseService:
                 content_data.content_text,
                 content_data.language,
             )
-            
+
             return {
                 "id": row["id"],
                 "content_key": row["content_key"],
@@ -1273,7 +1276,7 @@ class OratorDatabaseService:
                 "language": row["language"],
                 "is_active": row["is_active"],
                 "created_at": row["created_at"],
-                "updated_at": row["updated_at"]
+                "updated_at": row["updated_at"],
             }
 
     async def update_bot_content_admin(self, content_key: str, language: str, content_data) -> Optional[Dict[str, Any]]:
@@ -1281,43 +1284,42 @@ class OratorDatabaseService:
         async with self.pool.acquire() as conn:
             # Проверяем, существует ли контент
             existing = await conn.fetchrow(
-                "SELECT id FROM bot_content WHERE content_key = $1 AND language = $2",
-                content_key, language
+                "SELECT id FROM bot_content WHERE content_key = $1 AND language = $2", content_key, language
             )
-            
+
             if not existing:
                 return None
-            
+
             # Обновляем только указанные поля
             update_fields = []
             params = []
             param_count = 2
-            
+
             if content_data.content_text is not None:
                 update_fields.append(f"content_text = ${param_count + 1}")
                 params.append(content_data.content_text)
                 param_count += 1
-            
+
             if content_data.is_active is not None:
                 update_fields.append(f"is_active = ${param_count + 1}")
                 params.append(content_data.is_active)
                 param_count += 1
-            
+
             if not update_fields:
                 return None
-            
+
             update_fields.append("updated_at = CURRENT_TIMESTAMP")
-            
+
             query = f"""
                 UPDATE bot_content 
                 SET {', '.join(update_fields)}
                 WHERE content_key = $1 AND language = $2
                 RETURNING id, content_key, content_text, language, is_active, created_at, updated_at
             """
-            
+
             params = [content_key, language] + params
             row = await conn.fetchrow(query, *params)
-            
+
             return {
                 "id": row["id"],
                 "content_key": row["content_key"],
@@ -1325,7 +1327,7 @@ class OratorDatabaseService:
                 "language": row["language"],
                 "is_active": row["is_active"],
                 "created_at": row["created_at"],
-                "updated_at": row["updated_at"]
+                "updated_at": row["updated_at"],
             }
 
     async def deactivate_bot_content(self, content_key: str, language: str = "ru") -> bool:
@@ -1333,7 +1335,8 @@ class OratorDatabaseService:
         async with self.pool.acquire() as conn:
             result = await conn.execute(
                 "UPDATE bot_content SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE content_key = $1 AND language = $2",
-                content_key, language
+                content_key,
+                language,
             )
             return result != "UPDATE 0"
 
@@ -1342,7 +1345,8 @@ class OratorDatabaseService:
         async with self.pool.acquire() as conn:
             result = await conn.execute(
                 "UPDATE bot_content SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE content_key = $1 AND language = $2",
-                content_key, language
+                content_key,
+                language,
             )
             return result != "UPDATE 0"
 
@@ -1351,27 +1355,29 @@ class OratorDatabaseService:
         async with self.pool.acquire() as conn:
             search_query = "SELECT id, content_key, content_text, language, is_active, created_at, updated_at FROM bot_content WHERE content_text ILIKE $1"
             params = [f"%{query}%"]
-            
+
             if language:
                 search_query += " AND language = $2"
                 params.append(language)
-            
+
             search_query += " ORDER BY content_key, language"
-            
+
             rows = await conn.fetch(search_query, *params)
-            
+
             content_list = []
             for row in rows:
-                content_list.append({
-                    "id": row["id"],
-                    "content_key": row["content_key"],
-                    "content_text": row["content_text"],
-                    "language": row["language"],
-                    "is_active": row["is_active"],
-                    "created_at": row["created_at"],
-                    "updated_at": row["updated_at"]
-                })
-            
+                content_list.append(
+                    {
+                        "id": row["id"],
+                        "content_key": row["content_key"],
+                        "content_text": row["content_text"],
+                        "language": row["language"],
+                        "is_active": row["is_active"],
+                        "created_at": row["created_at"],
+                        "updated_at": row["updated_at"],
+                    }
+                )
+
             return content_list
 
     # Вспомогательные методы

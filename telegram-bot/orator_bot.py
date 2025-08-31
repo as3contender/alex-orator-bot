@@ -1,11 +1,23 @@
 import asyncio
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+    CallbackQueryHandler,
+    ChatMemberHandler,
+)
 from loguru import logger
 
 from config import BOT_TOKEN, BACKEND_URL
-from handlers import CommandHandler as OratorCommandHandler, CallbackHandler as OratorCallbackHandler
+from handlers import (
+    CommandHandler as OratorCommandHandler,
+    CallbackHandler as OratorCallbackHandler,
+    ChatMemberHandler as OratorChatMemberHandler,
+)
 from error_handler import ErrorHandler
 from orator_api_client import OratorAPIClient
 from bot_content_manager import BotContentManager
@@ -23,6 +35,7 @@ class AlexOratorBot:
         self.content_manager = BotContentManager(self.api_client)
         self.command_handler = OratorCommandHandler(self.api_client, self.content_manager)
         self.callback_handler = OratorCallbackHandler(self.api_client, self.content_manager, self.command_handler)
+        self.chat_member_handler = OratorChatMemberHandler(self.api_client, self.content_manager)
         self.error_handler = ErrorHandler()
 
         self._setup_handlers()
@@ -51,6 +64,11 @@ class AlexOratorBot:
         # Обработка текстовых сообщений
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.command_handler.handle_text_message)
+        )
+
+        # Обработка обновлений статуса участников чата (подписки/отписки)
+        self.application.add_handler(
+            ChatMemberHandler(self.chat_member_handler.handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
         )
 
     def _setup_error_handler(self):
