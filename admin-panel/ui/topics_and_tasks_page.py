@@ -261,7 +261,7 @@ def show_topics_table():
 
         with col2:
             # Показать JSON для отладки
-            if st.button("🔍 Показать JSON"):
+            if st.button("🔍 Показать JSON", key="show_json_topics"):
                 st.json(filtered_df.to_dict("records"))
     else:
         st.info("📭 Нет данных для отображения с выбранными фильтрами")

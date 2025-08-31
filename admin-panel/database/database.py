@@ -349,6 +349,122 @@ class AdminDatabase:
                 self.conn.rollback()
             return False
 
+    def get_week_registration_users(self):
+        """Получить список пользователей зарегистрированных на неделю"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT user_id FROM week_registrations
+                    WHERE status = 'active' AND week_end_date >= CURRENT_DATE
+                    ORDER BY week_start_date desc
+                    """
+                )
+                rows = cursor.fetchall()
+                result = [dict(row) for row in rows]
+                logger.info(f"✅ Получено {len(result)} пользователей зарегистрированных на неделю")
+                return result
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения пользователей зарегистрированных на неделю: {e}")
+            return []
+
+    def get_active_users(self):
+        """Получить список активных пользователей"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    select 
+                        u.id as user_id 
+                    from users u
+                    where
+                        telegram_id != ''
+                        and u.is_active = TRUE
+                    """
+                )
+                rows = cursor.fetchall()
+                result = [dict(row) for row in rows]
+                logger.info(f"✅ Получено {len(result)} активных пользователей")
+                return result
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения активных пользователей: {e}")
+            return []
+
+    def add_message_to_queue(self, user_id: str, message: str, keyboard: dict = None):
+        """Добавить сообщение в очередь"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO message_queue (user_id, message, keyboard) VALUES (%s, %s, %s)
+                    """,
+                    (user_id, message, keyboard),
+                )
+                self.conn.commit()
+                logger.info(f"✅ Сообщение добавлено в очередь для пользователя {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Ошибка добавления сообщения в очередь: {e}")
+            if self.conn:
+                self.conn.rollback()
+            return False
+
+    def get_message_queue(self):
+        """Получить все сообщения из очереди"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT 
+                        id, user_id, message, keyboard, sent, created_at, sent_at
+                    FROM message_queue
+                    ORDER BY created_at DESC
+                    """
+                )
+                rows = cursor.fetchall()
+                result = [dict(row) for row in rows]
+                logger.info(f"✅ Получено {len(result)} сообщений из очереди")
+                return result
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения сообщений из очереди: {e}")
+            return []
+
+    def get_users_by_telegram_id(self):
+        """Получить пользователей с telegram_id для выбора"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT 
+                        u.id, u.telegram_id, u.username, u.first_name, u.last_name, u.is_active
+                    FROM users u
+                    WHERE u.telegram_id IS NOT NULL AND u.telegram_id != ''
+                    ORDER BY u.first_name, u.last_name
+                    """
+                )
+                rows = cursor.fetchall()
+                result = [dict(row) for row in rows]
+                logger.info(f"✅ Получено {len(result)} пользователей с telegram_id")
+                return result
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения пользователей: {e}")
+            return []
+
     def get_statistics(self):
         """Получить статистику"""
         try:
