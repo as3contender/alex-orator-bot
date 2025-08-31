@@ -239,17 +239,23 @@ def main_admin_page():
     # Определяем доступные вкладки на основе роли
     if user_role in ["super_admin", "admin"]:
         # Администраторы видят управление контентом и пользователями
-        tab1, tab2 = st.tabs(["📝 Управление контентом", "👥 Управление пользователями"])
+        tab1, tab2, tab3 = st.tabs(["📝 Управление контентом", "📝 Темы и Задания", "👥 Управление пользователями"])
 
         with tab1:
             # Основная страница управления контентом
-            from ui.content_page import content_management_page
+            from content_page import content_management_page
 
             content_management_page()
 
         with tab2:
+            # Основная страница управления темами и задачами
+            from topics_and_tasks_page import topics_and_tasks_management_page
+
+            topics_and_tasks_management_page()
+
+        with tab3:
             # Страница управления пользователями
-            from ui.users_management import users_management_page
+            from users_management import users_management_page
 
             users_management_page()
 
@@ -259,7 +265,7 @@ def main_admin_page():
 
         with tab1:
             # Основная страница управления контентом
-            from ui.content_page import content_management_page
+            from content_page import content_management_page
 
             content_management_page()
 
@@ -269,7 +275,7 @@ def main_admin_page():
 
         with tab1:
             # Только просмотр контента
-            from ui.content_page import content_view_page
+            from content_page import content_view_page
 
             content_view_page()
 

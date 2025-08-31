@@ -6,15 +6,16 @@ from typing import Optional, List, Dict, Any
 from urllib.parse import quote_plus
 import os
 from datetime import datetime
+from loguru import logger
 
 # Загружаем переменные окружения из .env файла
 try:
     from dotenv import load_dotenv
 
     load_dotenv()
-    print("✅ Переменные окружения загружены в database.py")
+    logger.info("✅ Переменные окружения загружены в database.py")
 except ImportError:
-    print("⚠️ python-dotenv не установлен, используем системные переменные окружения")
+    logger.info("⚠️ python-dotenv не установлен, используем системные переменные окружения")
 
 
 class AdminDatabase:
@@ -32,15 +33,15 @@ class AdminDatabase:
 
         encoded_password = quote_plus(db_password)
         self.database_url = f"postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}"
-        print(f"🔗 Подключение к базе: postgresql://{db_user}:***@{db_host}:{db_port}/{db_name}")
+        logger.info(f"🔗 Подключение к базе: postgresql://{db_user}:***@{db_host}:{db_port}/{db_name}")
 
     def connect(self):
         """Подключение к базе данных"""
         try:
             self.conn = psycopg2.connect(self.database_url)
-            print("✅ Подключение к базе данных установлено")
+            logger.info("✅ Подключение к базе данных установлено")
         except Exception as e:
-            print(f"❌ Ошибка подключения к базе данных: {e}")
+            logger.error(f"❌ Ошибка подключения к базе данных: {e}")
             raise
 
     def disconnect(self):
@@ -48,7 +49,7 @@ class AdminDatabase:
         if self.conn:
             self.conn.close()
             self.conn = None
-            print("✅ Отключение от базы данных выполнено")
+            logger.info("✅ Отключение от базы данных выполнено")
 
     def get_all_bot_content(self, language: str = None, is_active: bool = None) -> List[Dict[str, Any]]:
         """Получить весь контент бота"""
@@ -72,17 +73,17 @@ class AdminDatabase:
 
             query += " ORDER BY content_key, language"
 
-            print(f"🔍 Выполняем запрос: {query}")
-            print(f"📝 Параметры: {params}")
+            logger.info(f"🔍 Выполняем запрос: {query}")
+            logger.info(f"📝 Параметры: {params}")
 
             with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
                 result = [dict(row) for row in rows]
-                print(f"✅ Получено {len(result)} записей")
+                logger.info(f"✅ Получено {len(result)} записей")
                 return result
         except Exception as e:
-            print(f"❌ Ошибка получения контента: {e}")
+            logger.info(f"❌ Ошибка получения контента: {e}")
             return []
 
     def create_bot_content(
@@ -106,7 +107,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return dict(row) if row else None
         except Exception as e:
-            print(f"❌ Ошибка создания контента: {e}")
+            logger.info(f"❌ Ошибка создания контента: {e}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -129,7 +130,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"❌ Ошибка обновления контента: {e}")
+            logger.info(f"❌ Ошибка обновления контента: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -148,7 +149,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"❌ Ошибка удаления контента: {e}")
+            logger.info(f"❌ Ошибка удаления контента: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -166,97 +167,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"❌ Ошибка полного удаления контента: {e}")
-            if self.conn:
-                self.conn.rollback()
-            return False
-
-    def get_users_with_problems(self) -> List[Dict[str, Any]]:
-        """Получить пользователей с проблемными данными"""
-        try:
-            if not self.conn:
-                self.connect()
-
-            query = """
-                SELECT id, telegram_id, username, first_name, last_name, 
-                       gender, registration_date, total_sessions, 
-                       feedback_count, is_active, created_at, updated_at
-                FROM users 
-                WHERE username IS NULL OR username = '' 
-                   OR first_name IS NULL OR first_name = ''
-                   OR last_name IS NULL OR last_name = ''
-                   OR gender IS NULL OR gender = ''
-                ORDER BY created_at DESC
-            """
-
-            print(f"🔍 Выполняем запрос: {query}")
-
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(query)
-                rows = cursor.fetchall()
-                result = [dict(row) for row in rows]
-                print(f"✅ Получено {len(result)} пользователей с проблемными данными")
-                return result
-        except Exception as e:
-            print(f"❌ Ошибка получения пользователей с проблемными данными: {e}")
-            return []
-
-    def fix_user_data(
-        self, telegram_id: int, username: str = None, first_name: str = None, last_name: str = None, gender: str = None
-    ) -> bool:
-        """Исправить данные пользователя"""
-        try:
-            if not self.conn:
-                self.connect()
-
-            # Формируем динамический UPDATE запрос
-            update_fields = []
-            params = []
-
-            if username is not None:
-                update_fields.append("username = %s")
-                params.append(username)
-            if first_name is not None:
-                update_fields.append("first_name = %s")
-                params.append(first_name)
-            if last_name is not None:
-                update_fields.append("last_name = %s")
-                params.append(last_name)
-            if gender is not None:
-                update_fields.append("gender = %s")
-                params.append(gender)
-
-            if not update_fields:
-                print("❌ Не указаны поля для обновления")
-                return False
-
-            update_fields.append("updated_at = CURRENT_TIMESTAMP")
-            params.append(telegram_id)
-
-            query = f"UPDATE users SET {', '.join(update_fields)} WHERE telegram_id = %s"
-
-            with self.conn.cursor() as cursor:
-                cursor.execute(query, params)
-                self.conn.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            print(f"❌ Ошибка исправления данных пользователя: {e}")
-            if self.conn:
-                self.conn.rollback()
-            return False
-
-    def delete_problem_user(self, telegram_id: int) -> bool:
-        """Удалить проблемного пользователя"""
-        try:
-            if not self.conn:
-                self.connect()
-
-            with self.conn.cursor() as cursor:
-                cursor.execute("DELETE FROM users WHERE telegram_id = %s", (telegram_id,))
-                self.conn.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            print(f"❌ Ошибка удаления пользователя: {e}")
+            logger.info(f"❌ Ошибка полного удаления контента: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -275,17 +186,175 @@ class AdminDatabase:
                 self.conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"❌ Ошибка активации контента: {e}")
+            logger.info(f"❌ Ошибка активации контента: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
-        
+
+    def get_topics_tree(self):
+        """Получить темы в плоском виде для таблицы"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    -- Получаем все темы с их иерархией через JOIN'ы
+                    SELECT 
+                        COALESCE(t3.topic_id, t2.topic_id, t1.topic_id) as topic_id,
+                        t1.name as topic_name,
+                        t2.name as level_name,
+                        t3.name as task_name,
+                        COALESCE(t3.description, t2.description, t1.description) as description,
+                        COALESCE(t3.is_active, t2.is_active, t1.is_active) as is_active,
+                        COALESCE(t3.level, t2.level, t1.level) as level,
+                        CASE 
+                            WHEN t3.id IS NOT NULL THEN 3
+                            WHEN t2.id IS NOT NULL THEN 2
+                            ELSE 1
+                        END as depth
+                    FROM topics t1
+                    LEFT JOIN topics t2 ON t2.parent_id = t1.id AND t2.level = 2 AND t2.is_active = TRUE
+                    LEFT JOIN topics t3 ON t3.parent_id = t2.id AND t3.level = 3 AND t3.is_active = TRUE
+                    WHERE t1.level = 1 AND t1.is_active = TRUE
+                    ORDER BY t1.topic_id, t2.topic_id, t3.topic_id
+                    """
+                )
+
+                rows = cursor.fetchall()
+                result = []
+
+                for row in rows:
+                    result.append(
+                        {
+                            "topic_id": row[0],
+                            "topic_name": row[1],
+                            "level_name": row[2],
+                            "task_name": row[3],
+                            "description": row[4],
+                            "is_active": row[5],
+                            "level": row[6],
+                            "depth": row[7],
+                        }
+                    )
+
+                logger.info(f"✅ Получено {len(result)} записей для таблицы")
+                return result
+
+        except Exception as e:
+            logger.info(f"❌ Ошибка получения данных для таблицы: {e}")
+            return []
+
+    def add_topic(
+        self, parent_name: str, level: int, element_name: str, description: str = None, is_active: bool = True
+    ):
+        """Добавить элемент с правильной генерацией topic_id"""
+        try:
+            if not self.conn:
+                self.connect()
+
+            with self.conn.cursor() as cursor:
+                # Если это уровень 1 (тема), добавляем как корневую тему
+                if level == 1:
+                    # Генерируем topic_id для уровня 1 (XX)
+                    cursor.execute("SELECT COUNT(*) FROM topics WHERE level = 1")
+                    topic_count = cursor.fetchone()[0]
+                    topic_id = f"{topic_count + 1:02d}"
+
+                    cursor.execute(
+                        "INSERT INTO topics (topic_id, name, level, sort_order, description, is_active) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (topic_id, element_name, level, level * 10, description, is_active),
+                    )
+                    logger.info(f"✅ Тема '{element_name}' добавлена с topic_id: {topic_id}")
+
+                # Если это уровень 2 (уровень), нужно найти родительскую тему
+                elif level == 2:
+                    if not parent_name:
+                        logger.error("❌ Не указана родительская тема для уровня")
+                        return False
+
+                    # Находим родительскую тему
+                    cursor.execute("SELECT topic_id FROM topics WHERE name = %s AND level = 1", (parent_name,))
+                    parent = cursor.fetchone()
+                    if parent:
+                        parent_topic_id = parent[0]
+
+                        # Генерируем topic_id для уровня 2 (XXXX)
+                        cursor.execute(
+                            "SELECT COUNT(*) FROM topics WHERE level = 2 AND topic_id LIKE %s", (f"{parent_topic_id}%",)
+                        )
+                        level_count = cursor.fetchone()[0]
+                        topic_id = f"{parent_topic_id}{level_count + 1:02d}"
+
+                        cursor.execute(
+                            "INSERT INTO topics (topic_id, name, level, sort_order, description, is_active, parent_id) VALUES (%s, %s, %s, %s, %s, %s, (SELECT id FROM topics WHERE topic_id = %s))",
+                            (
+                                topic_id,
+                                element_name,
+                                level,
+                                level * 10,
+                                description,
+                                is_active,
+                                parent_topic_id,
+                            ),
+                        )
+                        logger.info(f"✅ Уровень '{element_name}' добавлен с topic_id: {topic_id}")
+                    else:
+                        logger.error(f"❌ Родительская тема '{parent_name}' не найдена")
+                        return False
+
+                # Если это уровень 3 (задание), нужно найти родительский уровень
+                elif level == 3:
+                    if not parent_name:
+                        logger.error("❌ Не указан родительский уровень для задания")
+                        return False
+
+                    # Находим родительский уровень
+                    cursor.execute("SELECT topic_id FROM topics WHERE name = %s AND level = 2", (parent_name,))
+                    parent = cursor.fetchone()
+                    if parent:
+                        parent_topic_id = parent[0]
+
+                        # Генерируем topic_id для уровня 3 (XXXXXX)
+                        cursor.execute(
+                            "SELECT COUNT(*) FROM topics WHERE level = 3 AND topic_id LIKE %s", (f"{parent_topic_id}%",)
+                        )
+                        task_count = cursor.fetchone()[0]
+                        topic_id = f"{parent_topic_id}{task_count + 1:02d}"
+
+                        cursor.execute(
+                            "INSERT INTO topics (topic_id, name, level, sort_order, description, is_active, parent_id) VALUES (%s, %s, %s, %s, %s, %s, (SELECT id FROM topics WHERE topic_id = %s))",
+                            (
+                                topic_id,
+                                element_name,
+                                level,
+                                level * 10,
+                                description,
+                                is_active,
+                                parent_topic_id,
+                            ),
+                        )
+                        logger.info(f"✅ Задание '{element_name}' добавлено с topic_id: {topic_id}")
+                    else:
+                        logger.error(f"❌ Родительский уровень '{parent_name}' не найден")
+                        return False
+
+                self.conn.commit()
+                return True
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка добавления элемента: {e}")
+            if self.conn:
+                self.conn.rollback()
+            return False
+
     def get_statistics(self):
         """Получить статистику"""
         try:
             if not self.conn:
                 self.connect()
-                
+
                 with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute(
                         """
@@ -379,10 +448,10 @@ class AdminDatabase:
                     )
                     rows = cursor.fetchall()
                     result = [dict(row) for row in rows]
-                    print(f"✅ Получено {len(result)} строк статистики")
+                    logger.info(f"✅ Получено {len(result)} строк статистики")
                     return result
         except Exception as e:
-            print(f"❌ Ошибка получения статистики: {e}")
+            logger.info(f"❌ Ошибка получения статистики: {e}")
             return []
 
     def execute_sql_file(self, sql_file_path: str) -> List[Dict[str, Any]]:
@@ -393,7 +462,7 @@ class AdminDatabase:
                 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
                 sql_file_path = os.path.abspath(os.path.join(base_dir, sql_file_path))
 
-            print(f"📁 Выполняем SQL из файла: {sql_file_path}")
+            logger.info(f"📁 Выполняем SQL из файла: {sql_file_path}")
 
             with open(sql_file_path, "r", encoding="utf-8") as f:
                 sql = f.read()
@@ -402,10 +471,10 @@ class AdminDatabase:
                 cursor.execute(sql)
                 rows = cursor.fetchall()
                 result = [dict(row) for row in rows]
-                print(f"✅ SQL выполнен, получено {len(result)} строк")
+                logger.info(f"✅ SQL выполнен, получено {len(result)} строк")
                 return result
         except Exception as e:
-            print(f"❌ Ошибка выполнения SQL из файла '{sql_file_path}': {e}")
+            logger.info(f"❌ Ошибка выполнения SQL из файла '{sql_file_path}': {e}")
             return []
 
     def get_language_statistics(self):
@@ -423,7 +492,7 @@ class AdminDatabase:
             )
             return cursor.fetchall()
         except Exception as e:
-            print(f"Ошибка получения статистики по языкам: {e}")
+            logger.info(f"Ошибка получения статистики по языкам: {e}")
             return []
 
     def get_table_columns(self):
@@ -457,7 +526,7 @@ class AdminDatabase:
 
             return enhanced_columns
         except Exception as e:
-            print(f"Ошибка получения информации о колонках: {e}")
+            logger.info(f"Ошибка получения информации о колонках: {e}")
             return []
 
     def _get_column_tags(self, column_name):
@@ -519,7 +588,7 @@ class AdminDatabase:
                 row = cursor.fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            print(f"❌ Ошибка получения администратора: {e}")
+            logger.info(f"❌ Ошибка получения администратора: {e}")
             return None
 
     def update_admin_last_login(self, username: str) -> bool:
@@ -540,7 +609,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return True
         except Exception as e:
-            print(f"❌ Ошибка обновления времени входа: {e}")
+            logger.info(f"❌ Ошибка обновления времени входа: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -566,7 +635,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return dict(row) if row else None
         except Exception as e:
-            print(f"❌ Ошибка создания администратора: {e}")
+            logger.info(f"❌ Ошибка создания администратора: {e}")
             if self.conn:
                 self.conn.rollback()
             return None
@@ -600,7 +669,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"❌ Ошибка обновления администратора: {e}")
+            logger.info(f"❌ Ошибка обновления администратора: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -623,7 +692,7 @@ class AdminDatabase:
                 self.conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"❌ Ошибка удаления администратора: {e}")
+            logger.info(f"❌ Ошибка удаления администратора: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -646,7 +715,7 @@ class AdminDatabase:
                 rows = cursor.fetchall()
                 return [dict(row) for row in rows]
         except Exception as e:
-            print(f"❌ Ошибка получения списка администраторов: {e}")
+            logger.info(f"❌ Ошибка получения списка администраторов: {e}")
             return []
 
     def get_all_users(self) -> List[Dict[str, Any]]:
@@ -669,11 +738,11 @@ class AdminDatabase:
                     )
                     rows = cursor.fetchall()
                     result = [dict(row) for row in rows]
-                    print(f"✅ Получено {len(result)} пользователей с ролями")
+                    logger.info(f"✅ Получено {len(result)} пользователей с ролями")
                     return result
                 except Exception as role_error:
-                    print(f"⚠️ Ошибка при получении с ролями: {role_error}")
-                    print("🔄 Пробуем получить без ролей...")
+                    logger.info(f"⚠️ Ошибка при получении с ролями: {role_error}")
+                    logger.info("🔄 Пробуем получить без ролей...")
 
                     # Fallback - получаем без роли
                     cursor.execute(
@@ -692,10 +761,12 @@ class AdminDatabase:
                     for user in result:
                         user["role"] = "user"
 
-                    print(f"✅ Получено {len(result)} пользователей без ролей (установлена роль 'user' по умолчанию)")
+                    logger.info(
+                        f"✅ Получено {len(result)} пользователей без ролей (установлена роль 'user' по умолчанию)"
+                    )
                     return result
         except Exception as e:
-            print(f"❌ Ошибка получения пользователей: {e}")
+            logger.info(f"❌ Ошибка получения пользователей: {e}")
             return []
 
     def create_user(
@@ -709,38 +780,38 @@ class AdminDatabase:
     ) -> bool:
         """Создать нового пользователя"""
         try:
-            print(f"🔍 [DB] Начинаем создание пользователя: {username}")
-            print(f"🎭 [DB] Роль пользователя: {role}")
+            logger.info(f"🔍 [DB] Начинаем создание пользователя: {username}")
+            logger.info(f"🎭 [DB] Роль пользователя: {role}")
 
             if not self.conn:
-                print("🔗 [DB] Подключаемся к базе данных...")
+                logger.info("🔗 [DB] Подключаемся к базе данных...")
                 self.connect()
 
             # Генерируем UUID для пользователя
             import uuid
 
             user_id = str(uuid.uuid4())
-            print(f"🆔 [DB] Сгенерирован ID: {user_id}")
+            logger.info(f"🆔 [DB] Сгенерирован ID: {user_id}")
 
             # Хешируем пароль (используем простой хеш для демонстрации)
             import hashlib
 
             hashed_password = hashlib.sha256(password.encode()).hexdigest()
-            print(f"🔒 [DB] Пароль захеширован")
+            logger.info(f"🔒 [DB] Пароль захеширован")
 
             # Подготавливаем данные
             first_name = full_name if full_name else username
             last_name = full_name if full_name else username
             telegram_id_val = telegram_id if telegram_id else None
 
-            print(f"📝 [DB] Подготовленные данные:")
-            print(f"   [DB] First name: {first_name}")
-            print(f"   [DB] Last name: {last_name}")
-            print(f"   [DB] Telegram ID: {telegram_id_val}")
-            print(f"   [DB] Role: {role}")
+            logger.info(f"📝 [DB] Подготовленные данные:")
+            logger.info(f"   [DB] First name: {first_name}")
+            logger.info(f"   [DB] Last name: {last_name}")
+            logger.info(f"   [DB] Telegram ID: {telegram_id_val}")
+            logger.info(f"   [DB] Role: {role}")
 
             with self.conn.cursor() as cursor:
-                print("📋 [DB] Выполняем INSERT запрос...")
+                logger.info("📋 [DB] Выполняем INSERT запрос...")
 
                 # Сначала проверяем, есть ли колонка role в таблице
                 try:
@@ -764,10 +835,10 @@ class AdminDatabase:
                             datetime.now(),
                         ),
                     )
-                    print(f"✅ [DB] INSERT с ролью выполнен, affected rows: {cursor.rowcount}")
+                    logger.info(f"✅ [DB] INSERT с ролью выполнен, affected rows: {cursor.rowcount}")
                 except Exception as role_error:
-                    print(f"⚠️ [DB] Ошибка при вставке с ролью: {role_error}")
-                    print("🔄 [DB] Пробуем вставить без роли...")
+                    logger.info(f"⚠️ [DB] Ошибка при вставке с ролью: {role_error}")
+                    logger.info("🔄 [DB] Пробуем вставить без роли...")
 
                     # Fallback - вставляем без роли
                     cursor.execute(
@@ -790,16 +861,16 @@ class AdminDatabase:
                             datetime.now(),
                         ),
                     )
-                    print(f"✅ [DB] INSERT без роли выполнен, affected rows: {cursor.rowcount}")
+                    logger.info(f"✅ [DB] INSERT без роли выполнен, affected rows: {cursor.rowcount}")
 
                 self.conn.commit()
-                print(f"✅ [DB] Пользователь {username} успешно создан")
+                logger.info(f"✅ [DB] Пользователь {username} успешно создан")
                 return True
         except Exception as e:
-            print(f"❌ [DB] Ошибка создания пользователя: {e}")
+            logger.info(f"❌ [DB] Ошибка создания пользователя: {e}")
             import traceback
 
-            traceback.print_exc()
+            traceback.logger.info_exc()
             if self.conn:
                 self.conn.rollback()
             return False
@@ -826,12 +897,12 @@ class AdminDatabase:
                     row = cursor.fetchone()
                     if row:
                         user_data = dict(row)
-                        print(f"✅ Получен пользователь {username} с ролью: {user_data.get('role', 'user')}")
+                        logger.info(f"✅ Получен пользователь {username} с ролью: {user_data.get('role', 'user')}")
                         return user_data
                     return None
                 except Exception as role_error:
-                    print(f"⚠️ Ошибка при получении с ролью: {role_error}")
-                    print("🔄 Пробуем получить без роли...")
+                    logger.info(f"⚠️ Ошибка при получении с ролью: {role_error}")
+                    logger.info("🔄 Пробуем получить без роли...")
 
                     # Fallback - получаем без роли
                     cursor.execute(
@@ -848,17 +919,19 @@ class AdminDatabase:
                     if row:
                         user_data = dict(row)
                         user_data["role"] = "user"  # Устанавливаем роль по умолчанию
-                        print(f"✅ Получен пользователь {username} без роли (установлена роль 'user' по умолчанию)")
+                        logger.info(
+                            f"✅ Получен пользователь {username} без роли (установлена роль 'user' по умолчанию)"
+                        )
                         return user_data
                     return None
         except Exception as e:
-            print(f"❌ Ошибка получения пользователя: {e}")
+            logger.info(f"❌ Ошибка получения пользователя: {e}")
             return None
 
     def update_user_role(self, username: str, new_role: str) -> bool:
         """Обновить роль пользователя"""
         try:
-            print(f"🔄 [DB] Обновляем роль пользователя {username} на {new_role}")
+            logger.info(f"🔄 [DB] Обновляем роль пользователя {username} на {new_role}")
 
             if not self.conn:
                 self.connect()
@@ -877,19 +950,19 @@ class AdminDatabase:
 
                     if cursor.rowcount > 0:
                         self.conn.commit()
-                        print(f"✅ [DB] Роль пользователя {username} успешно обновлена на {new_role}")
+                        logger.info(f"✅ [DB] Роль пользователя {username} успешно обновлена на {new_role}")
                         return True
                     else:
-                        print(f"❌ [DB] Пользователь {username} не найден или неактивен")
+                        logger.info(f"❌ [DB] Пользователь {username} не найден или неактивен")
                         return False
 
                 except Exception as role_error:
-                    print(f"⚠️ [DB] Ошибка при обновлении роли: {role_error}")
-                    print("🔄 [DB] Возможно, колонка role не существует")
+                    logger.info(f"⚠️ [DB] Ошибка при обновлении роли: {role_error}")
+                    logger.info("🔄 [DB] Возможно, колонка role не существует")
                     return False
 
         except Exception as e:
-            print(f"❌ [DB] Ошибка обновления роли: {e}")
+            logger.info(f"❌ [DB] Ошибка обновления роли: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -897,7 +970,7 @@ class AdminDatabase:
     def delete_user(self, user_id: str) -> bool:
         """Удалить пользователя по ID"""
         try:
-            print(f"🗑️ [DB] Удаляем пользователя с ID: {user_id}")
+            logger.info(f"🗑️ [DB] Удаляем пользователя с ID: {user_id}")
 
             if not self.conn:
                 self.connect()
@@ -908,21 +981,21 @@ class AdminDatabase:
                 user_info = cursor.fetchone()
                 username = user_info[0] if user_info else "Unknown"
 
-                print(f"🗑️ [DB] Удаляем пользователя: {username}")
+                logger.info(f"🗑️ [DB] Удаляем пользователя: {username}")
 
                 # Удаляем пользователя
                 cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
-                    print(f"✅ [DB] Пользователь {username} успешно удален")
+                    logger.info(f"✅ [DB] Пользователь {username} успешно удален")
                     return True
                 else:
-                    print(f"❌ [DB] Пользователь с ID {user_id} не найден")
+                    logger.info(f"❌ [DB] Пользователь с ID {user_id} не найден")
                     return False
 
         except Exception as e:
-            print(f"❌ [DB] Ошибка удаления пользователя: {e}")
+            logger.info(f"❌ [DB] Ошибка удаления пользователя: {e}")
             if self.conn:
                 self.conn.rollback()
             return False
@@ -963,6 +1036,7 @@ def create_db_instance():
     if _db_instance is None:
         _db_instance = AdminDatabase()
     return _db_instance
+
 
 # Для обратной совместимости
 db = property(get_db)
