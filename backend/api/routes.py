@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from api import auth, health, user_settings, channel_subscribers
+from api import auth, health, user_settings, database, channel_subscribers
 from api.orator import router as orator_router
 
 router = APIRouter()
@@ -8,6 +8,7 @@ router = APIRouter()
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 router.include_router(health.router, prefix="/health", tags=["Health"])
 router.include_router(user_settings.router, prefix="/settings", tags=["User Settings"])
+router.include_router(database.router, prefix="/database", tags=["Database"])
 router.include_router(channel_subscribers.router, prefix="/channels", tags=["Channel Subscribers"])
 
 router.include_router(orator_router, prefix="/orator", tags=["Alex Orator Bot"])

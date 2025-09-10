@@ -153,6 +153,7 @@ logs/
 backups/
 .env.local
 .env.production
+env_config.py
 
 # Docker
 .dockerignore

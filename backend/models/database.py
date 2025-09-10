@@ -14,8 +14,9 @@ class ColumnInfo(BaseModel):
     """Информация о колонке"""
 
     name: str
-    data_type: str
-    is_nullable: bool
+    type: str
+    nullable: bool
+    default: Optional[str] = None
     description: Optional[str] = None
 
 
