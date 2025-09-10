@@ -1,23 +1,35 @@
 import streamlit as st
 import asyncio
 import json
+import os
+import sys
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from auth import get_auth, auth, create_default_admin
-from database import get_db, db
+# Добавляем путь к корневой директории admin-panel для импорта модулей
+current_dir = os.path.dirname(os.path.abspath(__file__))
+admin_panel_root = os.path.dirname(current_dir)  # Поднимаемся на уровень выше (из ui/ в admin-panel/)
+sys.path.append(admin_panel_root)
+
+try:
+    from security.auth import get_auth, auth
+    from database.database import get_db, db
+except ImportError as e:
+    st.error(f"❌ Ошибка импорта модулей: {e}")
+    st.error(f"📁 Текущая директория: {os.getcwd()}")
+    st.error(f"📁 Путь к admin-panel: {admin_panel_root}")
+    st.error(f"📁 Python path: {sys.path}")
+    st.stop()
 
 
 # Настройка страницы
 st.set_page_config(
-    page_title="Admin Panel - Alex Orator Bot",
-    page_icon="👨🏻‍💼",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Admin Panel - Alex Orator Bot", page_icon="👨🏻‍💼", layout="wide", initial_sidebar_state="expanded"
 )
 
 # CSS стили для страницы входа
-st.markdown("""
+st.markdown(
+    """
 <style>
 
 
@@ -87,7 +99,9 @@ st.markdown("""
     margin: 0;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Инициализация сессии
 if "authenticated" not in st.session_state:
@@ -105,33 +119,36 @@ def login_page():
     col1, col2, col3 = st.columns(3)
     with col2:
         st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        
-        st.markdown('<h2 style="text-align: center; color: white; margin-bottom: 2rem;">Вход в админ-панель</h2>', unsafe_allow_html=True)
-        
+
+        st.markdown(
+            '<h2 style="text-align: center; color: white; margin-bottom: 2rem;">Вход в админ-панель</h2>',
+            unsafe_allow_html=True,
+        )
+
         with st.form("login_form"):
             username = st.text_input("👤 Имя пользователя", key="login_username_input")
             password = st.text_input("🔒 Пароль", type="password", key="login_password_input")
-            
+
             if st.form_submit_button("🚀 Войти", use_container_width=True):
                 if username and password:
                     # Используем новую аутентификацию
-                    from auth import authenticate_user, get_user_info
-                    
+                    from security.auth import authenticate_user, get_user_info
+
                     if authenticate_user(username, password):
                         # Получаем информацию о пользователе
                         user_info = get_user_info(username)
                         if user_info:
                             # Создаем токен (для совместимости)
                             token = auth.create_access_token(data={"sub": user_info["username"]})
-                            
+
                             # Сохраняем в сессии
                             st.session_state.authenticated = True
                             st.session_state.admin_info = user_info
                             st.session_state.token = token
-                            
+
                             # Устанавливаем роль пользователя в session_state для системы прав доступа
                             st.session_state.user_role = user_info.get("role", "user")
-                            
+
                             # Показываем информацию о типе пользователя
                             if user_info.get("user_type") == "admin":
                                 st.success("✅ Успешная авторизация администратора!")
@@ -139,7 +156,7 @@ def login_page():
                                 st.success("✅ Успешная авторизация пользователя!")
                             else:
                                 st.success("✅ Успешная авторизация системного пользователя!")
-                            
+
                             # Принудительно обновляем страницу
                             st.rerun()
                         else:
@@ -148,17 +165,17 @@ def login_page():
                         st.error("❌ Неверное имя пользователя или пароль")
                 else:
                     st.error("❌ Введите логин и пароль")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def main_admin_page():
     """Основная страница админки"""
-    
+
     if not st.session_state.authenticated:
         login_page()
         return
-    
+
     # Проверяем токен (только для администраторов) - временно отключаем для отладки
     # if st.session_state.token and st.session_state.admin_info.get('user_type') == 'admin':
     #     try:
@@ -177,33 +194,37 @@ def main_admin_page():
     #             st.session_state.token = None
     #             st.rerun()
     #             return
-    
+
     # Заголовок
-    user_type = st.session_state.admin_info.get('user_type', 'unknown')
-    role_display = st.session_state.admin_info.get('role', 'Unknown')
-    
+    user_type = st.session_state.admin_info.get("user_type", "unknown")
+    role_display = st.session_state.admin_info.get("role", "Unknown")
+
     # Получаем красивую роль для отображения
-    from auth import get_user_role
-    username = st.session_state.admin_info.get('username', 'Unknown')
+    from security.auth import get_user_role
+
+    username = st.session_state.admin_info.get("username", "Unknown")
     display_role = get_user_role(username)
-    
-    if user_type == 'admin':
+
+    if user_type == "admin":
         header_icon = "👨🏻‍💼"
         header_title = "Админ-панель Alex Orator Bot"
-    elif user_type == 'user':
+    elif user_type == "user":
         header_icon = "👤"
         header_title = "Панель просмотра Alex Orator Bot"
     else:
         header_icon = "🔧"
         header_title = "Системная панель Alex Orator Bot"
-    
-    st.markdown(f"""
+
+    st.markdown(
+        f"""
     <div class="main-header">
         <h1>{header_icon} {header_title}</h1>
         <p>Добро пожаловать, {username} !</p>
     </div>
-    """, unsafe_allow_html=True)
-    
+    """,
+        unsafe_allow_html=True,
+    )
+
     # Кнопка выхода
     if st.sidebar.button("🚪 Выйти", type="secondary"):
         st.session_state.authenticated = False
@@ -211,52 +232,64 @@ def main_admin_page():
         st.session_state.token = None
         st.session_state.user_role = "user"
         st.rerun()
-    
+
     # Создаем вкладки для разных разделов на основе роли пользователя
     user_role = st.session_state.get("user_role", "user")
-    
+
     # Определяем доступные вкладки на основе роли
     if user_role in ["super_admin", "admin"]:
         # Администраторы видят управление контентом и пользователями
-        tab1, tab2 = st.tabs(["📝 Управление контентом", "👥 Управление пользователями"])
-        
+        tab1, tab2, tab3, tab4 = st.tabs(
+            ["📝 Управление контентом", "📝 Темы и Задания", "📨 Очередь сообщений", "👥 Управление пользователями"]
+        )
+
         with tab1:
             # Основная страница управления контентом
             from content_page import content_management_page
+
             content_management_page()
-        
+
         with tab2:
+            # Основная страница управления темами и задачами
+            from topics_and_tasks_page import topics_and_tasks_management_page
+
+            topics_and_tasks_management_page()
+
+        with tab3:
+            # Страница управления очередью сообщений
+            from message_queau_page import message_queue_management_page
+
+            message_queue_management_page()
+
+        with tab4:
             # Страница управления пользователями
             from users_management import users_management_page
+
             users_management_page()
-    
+
     elif user_role == "moderator":
         # Модераторы видят только управление контентом
-        tab1, = st.tabs(["📝 Управление контентом"])
-        
+        (tab1,) = st.tabs(["📝 Управление контентом"])
+
         with tab1:
             # Основная страница управления контентом
             from content_page import content_management_page
+
             content_management_page()
-    
+
     else:
         # Обычные пользователи видят только просмотр контента
-        tab1, = st.tabs(["📝 Просмотр контента"])
-        
+        (tab1,) = st.tabs(["📝 Просмотр контента"])
+
         with tab1:
             # Только просмотр контента
             from content_page import content_view_page
+
             content_view_page()
 
 
 def main():
     """Главная функция"""
-    # Инициализируем администратора по умолчанию при первом запуске
-    try:
-        create_default_admin()
-    except Exception as e:
-        st.error(f"❌ Ошибка инициализации администратора: {e}")
-    
     # Проверяем аутентификацию
     if not st.session_state.authenticated:
         login_page()

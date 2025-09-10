@@ -8,6 +8,8 @@
 [Telegram Bot] <---> [FastAPI Backend] <---> [PostgreSQL]
                               |
                     [Worker для отправки сообщений]
+                              |
+                    [Admin Panel] <---> [PostgreSQL]
 ```
 
 ## 🚀 Быстрый старт
@@ -32,12 +34,14 @@ docker-compose -f docker-compose.local.yml up -d
 ### 3. Проверка работы
 - **Backend**: http://localhost:8000/health
 - **Telegram Bot**: Найдите вашего бота и отправьте `/start`
+- **Admin Panel**: http://localhost:8501 (требует создания администратора)
 
 ## 📦 Технологический стек
 
 - **Backend**: FastAPI, PostgreSQL, SQLAlchemy
 - **Telegram Bot**: python-telegram-bot, aiohttp
 - **Worker**: Асинхронная отправка сообщений
+- **Admin Panel**: Streamlit, bcrypt, JWT
 - **Инфраструктура**: Docker, Docker Compose, Make
 
 ## 🗂️ Структура проекта
@@ -119,6 +123,30 @@ alex-orator-bot/
 │   ├── db.py               # Подключение к БД
 │   ├── requirements.txt    # Зависимости
 │   └── Dockerfile          # Docker образ
+├── admin-panel/            # Админ-панель
+│   ├── ui/                 # Пользовательский интерфейс
+│   │   ├── admin_app.py    # Главное приложение
+│   │   ├── content_page.py # Управление контентом
+│   │   └── users_management.py # Управление пользователями
+│   ├── security/           # Модули безопасности
+│   │   ├── security.py     # Основной модуль безопасности
+│   │   └── auth.py         # Аутентификация
+│   ├── database/           # Работа с БД
+│   │   └── database.py     # Подключение к БД
+│   ├── utils/              # Утилиты
+│   │   ├── migrate_passwords.py # Миграция паролей
+│   │   └── apply_db_changes.py # Изменения БД
+│   ├── config/             # Конфигурация
+│   │   ├── requirements.txt # Зависимости
+│   │   └── env.example     # Пример переменных
+│   ├── docs/               # Документация
+│   │   ├── README_SECURITY.md # Безопасность
+│   │   ├── DOCKER_SETUP.md # Docker настройка
+│   │   └── PRODUCTION_DEPLOYMENT.md # Продакшен
+│   ├── Dockerfile          # Docker образ
+│   ├── .dockerignore       # Docker исключения
+│   ├── .gitignore          # Git исключения
+│   └── README.md           # Документация
 ├── deployment/             # Конфигурации развертывания
 │   ├── deploy_alex_orator.sh # Скрипт деплоя
 │   ├── init-orator-app-db.sql # Инициализация БД
@@ -156,6 +184,12 @@ alex-orator-bot/
 - `/profile` - Профиль пользователя
 - `/stats` - Статистика тренировок
 - `/help` - Справка
+
+### Admin Panel
+- **Управление контентом** - Редактирование сообщений бота
+- **Управление пользователями** - Просмотр и управление пользователями
+- **Безопасность** - bcrypt хеширование, JWT токены, защита от брутфорса
+- **Мониторинг** - Логирование действий и статистика
 
 ### Make команды
 ```bash

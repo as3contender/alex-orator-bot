@@ -9,6 +9,7 @@ from .registration_handler import RegistrationHandler
 from .topics_handler import TopicsHandler
 from .pairs_handler import PairsHandler
 from .feedback_handler import FeedbackHandler
+from .chat_member_handler import ChatMemberHandler
 
 __all__ = [
     "OratorBaseHandler",
@@ -18,4 +19,5 @@ __all__ = [
     "TopicsHandler",
     "PairsHandler",
     "FeedbackHandler",
+    "ChatMemberHandler",
 ]

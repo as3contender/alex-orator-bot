@@ -107,6 +107,35 @@ class AppDatabaseService:
             """
             )
 
+            # Таблица подписчиков каналов
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS channel_subscribers (
+                    id SERIAL PRIMARY KEY,
+                    chat_id BIGINT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    status VARCHAR(20) NOT NULL CHECK (status IN ('member', 'left', 'kicked', 'administrator', 'creator')),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    UNIQUE(chat_id, user_id)
+                )
+            """
+            )
+
+            # Индексы для таблицы channel_subscribers
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_channel_subscribers_chat_id ON channel_subscribers(chat_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_channel_subscribers_user_id ON channel_subscribers(user_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_channel_subscribers_status ON channel_subscribers(status)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_channel_subscribers_updated_at ON channel_subscribers(updated_at)"
+            )
+
             logger.info("Application database tables created/verified")
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:

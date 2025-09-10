@@ -253,5 +253,17 @@ class SecurityManager:
         return self.password_security.validate_password_strength(password)
 
 
-# Глобальный экземпляр менеджера безопасности
-security_manager = SecurityManager()
+# Глобальный экземпляр менеджера безопасности (ленивая инициализация)
+_security_manager_instance = None
+
+
+def get_security_manager():
+    """Получить экземпляр менеджера безопасности"""
+    global _security_manager_instance
+    if _security_manager_instance is None:
+        _security_manager_instance = SecurityManager()
+    return _security_manager_instance
+
+
+# Для обратной совместимости
+security_manager = property(get_security_manager)

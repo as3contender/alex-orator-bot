@@ -3,7 +3,7 @@
 Скрипт для удаления пользователя admin из таблицы admin_users
 """
 
-from database import AdminDatabase
+from database.database import AdminDatabase
 
 def main():
     print("🗑️ Удаляем пользователя admin из admin_users...")

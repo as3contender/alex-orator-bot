@@ -9,12 +9,13 @@ from datetime import datetime, timezone
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
+from loguru import logger
 
 from db import get_db_pool, close_db_pool  # используем твои функции из db.py
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Используем тот же токен, что и основной бот
 CHECK_INTERVAL = int(os.getenv("WORKER_CHECK_INTERVAL", "2"))  # сек
 BATCH_SIZE = int(os.getenv("WORKER_BATCH_SIZE", "50"))
 CONCURRENCY = int(os.getenv("WORKER_CONCURRENCY", "10"))
@@ -139,7 +140,7 @@ async def run_worker(stop_event: asyncio.Event):
 
 async def main():
     if not BOT_TOKEN:
-        raise RuntimeError("BOT_TOKEN должен быть задан в переменных окружения")
+        raise RuntimeError("TELEGRAM_TOKEN должен быть задан в переменных окружения")
 
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
