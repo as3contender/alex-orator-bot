@@ -144,8 +144,9 @@ def create_default_admin():
 
         logger.info("✅ Администратор по умолчанию создан")
         logger.info(f"🔑 Логин: admin")
-        logger.info(f"🔑 Пароль: {default_password}")
+        logger.info(f"🔑 Пароль: [СКРЫТО - проверьте консоль]")
         logger.warning("⚠️ ОБЯЗАТЕЛЬНО измените пароль после первого входа!")
+        print(f"🔑 ВРЕМЕННЫЙ ПАРОЛЬ: {default_password}")
 
         return True
 
