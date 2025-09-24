@@ -11,17 +11,35 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Таблица пользователей (расширенная для Telegram)
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    telegram_id VARCHAR(100) UNIQUE NOT NULL,
+    email VARCHAR(255),
     username VARCHAR(100),
+    hashed_password VARCHAR(255),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
+    telegram_id VARCHAR(100),
+    telegram_username VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    is_superuser BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     gender VARCHAR(10) CHECK (gender IN ('male', 'female', 'other')),
-    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_sessions INTEGER DEFAULT 0,
     feedback_count INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT users_email_key UNIQUE (email),
+    CONSTRAINT users_telegram_id_key UNIQUE (telegram_id),
+    CONSTRAINT users_username_key UNIQUE (username)
+);
+
+-- Таблица очереди сообщений
+CREATE TABLE IF NOT EXISTS message_queue (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    sent BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    sent_at TIMESTAMP,
+    keyboard JSONB DEFAULT '{}'::jsonb
 );
 
 -- ============================================================================
@@ -123,6 +141,7 @@ CREATE TABLE IF NOT EXISTS orator_settings (
 -- Индексы для таблицы пользователей
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_gender ON users(gender);
 CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
 
@@ -154,6 +173,11 @@ CREATE INDEX IF NOT EXISTS idx_bot_content_is_active ON bot_content(is_active);
 -- Индексы для таблицы настроек
 CREATE INDEX IF NOT EXISTS idx_orator_settings_key ON orator_settings(key);
 CREATE INDEX IF NOT EXISTS idx_orator_settings_is_active ON orator_settings(is_active);
+
+-- Индексы для таблицы очереди сообщений
+CREATE INDEX IF NOT EXISTS idx_message_queue_user_id ON message_queue(user_id);
+CREATE INDEX IF NOT EXISTS idx_message_queue_sent ON message_queue(sent);
+CREATE INDEX IF NOT EXISTS idx_message_queue_created_at ON message_queue(created_at);
 
 -- ============================================================================
 -- ТРИГГЕРЫ ДЛЯ ОБНОВЛЕНИЯ TIMESTAMP
